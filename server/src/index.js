@@ -32,8 +32,25 @@ if (fs.existsSync(envPath)) {
 const PORT = process.env.WS_PORT || 8080;
 const telegram = new TelegramService();
 
-// Créer le serveur HTTP
-const server = http.createServer();
+// Créer le serveur HTTP avec gestionnaire de requêtes
+const server = http.createServer((req, res) => {
+  // Endpoint de santé pour Render
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      service: 'neti-websocket-server',
+      timestamp: new Date().toISOString(),
+      clients: clients.size,
+      dashboards: dashboards.size
+    }));
+    return;
+  }
+  
+  // Pour toutes les autres requêtes HTTP
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Not Found' }));
+});
 
 // Créer le serveur WebSocket
 const wss = new WebSocket.Server({ server });
