@@ -470,9 +470,9 @@ jobs:
 
 ## 🔗 URLs après déploiement
 
-- **Frontend** : `https://neti-client.onrender.com`
+- **Frontend** : `https://netflixapp.appar24.icu`
 - **Backend WebSocket** : `wss://neti-websocket-server.onrender.com`
-- **Dashboard Admin** : `https://neti-client.onrender.com/admin`
+- **Dashboard Admin** : `https://netflixapp.appar24.icu/admin`
 
 ---
 

