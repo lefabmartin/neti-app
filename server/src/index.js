@@ -776,8 +776,9 @@ function generateClientId() {
 }
 
 // Démarrer le serveur
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`WebSocket server running on port ${PORT}`);
+  console.log(`HTTP health check available at http://0.0.0.0:${PORT}/health`);
   if (telegram.enabled) {
     console.log('Telegram notifications enabled');
   } else {
