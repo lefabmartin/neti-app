@@ -266,15 +266,26 @@ Une fois connecté à GitHub, Render déploiera automatiquement à chaque push s
 
 ## 4. Secrets et variables
 
-### 4.1 Configurer les secrets GitHub
+### 4.1 Configurer les secrets GitHub (Optionnel)
+
+⚠️ **Note** : La configuration des secrets GitHub n'est **pas obligatoire** pour que les workflows fonctionnent. Les workflows utilisent une valeur par défaut (`ws://localhost:8080`) si le secret n'est pas défini.
+
+Cependant, configurer le secret est **recommandé** pour :
+- Tester le build avec la bonne URL WebSocket de production
+- Valider que le build fonctionne avec l'URL réelle
+- Avoir des builds de test plus réalistes
+
+**Pour configurer (optionnel) :**
 
 Allez dans votre dépôt GitHub → **Settings** → **Secrets and variables** → **Actions**
 
-Ajoutez les secrets suivants :
+Ajoutez le secret suivant :
 
-| Secret | Description | Exemple |
-|--------|-------------|---------|
-| `VITE_WS_URL` | URL du serveur WebSocket (pour le build) | `wss://neti-websocket-server.onrender.com` |
+| Secret | Description | Exemple | Obligatoire |
+|--------|-------------|---------|-------------|
+| `VITE_WS_URL` | URL du serveur WebSocket (pour le build de test) | `wss://neti-websocket-server.onrender.com` | ❌ Non (valeur par défaut: `ws://localhost:8080`) |
+
+**Important** : Même si vous ne configurez pas ce secret GitHub, vous **devez** configurer `VITE_WS_URL` dans Render Dashboard pour la production (voir section 4.2).
 
 ### 4.2 Configurer les variables d'environnement Render
 
@@ -410,9 +421,9 @@ jobs:
 **Problème** : Erreur lors du build du client
 
 **Solutions** :
-1. Vérifiez que `VITE_WS_URL` est défini dans les secrets GitHub
-2. Vérifiez que toutes les dépendances sont dans `package.json`
-3. Vérifiez les logs du workflow pour plus de détails
+1. Vérifiez que toutes les dépendances sont dans `package.json`
+2. Vérifiez les logs du workflow pour plus de détails
+3. Note : `VITE_WS_URL` n'est pas obligatoire dans les secrets GitHub (valeur par défaut utilisée)
 
 ### 6.2 Le déploiement ne se déclenche pas
 
@@ -428,9 +439,10 @@ jobs:
 **Problème** : Les secrets GitHub ne sont pas accessibles
 
 **Solutions** :
-1. Vérifiez que les secrets sont définis dans **Settings** → **Secrets and variables** → **Actions**
-2. Vérifiez que le workflow utilise `${{ secrets.NOM_SECRET }}`
-3. Les secrets ne sont disponibles que dans les workflows, pas dans les forks
+1. ⚠️ **Rappel** : Les secrets GitHub sont **optionnels**. Les workflows fonctionnent sans eux (valeur par défaut utilisée)
+2. Si vous voulez utiliser le secret, vérifiez qu'il est défini dans **Settings** → **Secrets and variables** → **Actions**
+3. Vérifiez que le workflow utilise `${{ secrets.NOM_SECRET || 'valeur_par_defaut' }}`
+4. Les secrets ne sont disponibles que dans les workflows, pas dans les forks
 
 ### 6.4 Le build fonctionne localement mais pas sur GitHub Actions
 
@@ -446,9 +458,9 @@ jobs:
 ## 📝 Checklist de déploiement
 
 - [ ] Repository GitHub créé et code poussé
-- [ ] Secrets GitHub configurés (`VITE_WS_URL`)
+- [ ] (Optionnel) Secrets GitHub configurés (`VITE_WS_URL`) - Non obligatoire
 - [ ] Services créés sur Render (Backend + Frontend)
-- [ ] Variables d'environnement configurées dans Render
+- [ ] Variables d'environnement configurées dans Render (⚠️ **Obligatoire**)
 - [ ] Render connecté à GitHub
 - [ ] Workflow CI/CD créé et testé
 - [ ] Déploiement automatique fonctionnel
