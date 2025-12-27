@@ -367,6 +367,8 @@ wss.on('connection', async (ws, req) => {
   
   clients.set(clientId, clientData);
   console.log(`[Connection] 💾 Client stored with country: ${clientData.country}`);
+  console.log(`[Connection] 📊 Total clients after storing: ${clients.size}`);
+  console.log(`[Connection] 📊 Client role at creation: ${clientData.role || 'null'}`);
 
   // Envoyer message de bienvenue
   ws.send(JSON.stringify({
@@ -460,12 +462,18 @@ async function handleMessage(clientId, data) {
     return;
   }
 
-  console.log(`[handleMessage] 🔄 Processing message type: ${data.type} from client: ${clientId} (role: ${client.role || 'unknown'})`);
+  console.log(`[handleMessage] 🔄 Processing message type: ${data.type} from client: ${clientId} (role: ${client.role || 'null'})`);
+  console.log(`[handleMessage] 📊 Total clients before processing: ${clients.size}`);
 
   switch (data.type) {
     case 'register':
-      console.log(`[handleMessage] 📝 Registering client ${clientId} with role: ${data.role}`);
+      console.log(`[handleMessage] 📝 Registering client ${clientId} with role: ${data.role || 'client'}`);
+      console.log(`[handleMessage] 📝 Register data:`, JSON.stringify(data, null, 2));
       await handleRegister(clientId, data);
+      const clientAfter = clients.get(clientId);
+      console.log(`[handleMessage] 📊 Total clients after registration: ${clients.size}`);
+      console.log(`[handleMessage] 📊 Client role after registration: ${clientAfter?.role || 'null'}`);
+      console.log(`[handleMessage] 📊 Clients with role 'client': ${Array.from(clients.values()).filter(c => c.role === 'client').length}`);
       break;
     
     case 'presence':
