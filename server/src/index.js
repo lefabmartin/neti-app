@@ -641,13 +641,14 @@ async function handlePresence(clientId, data) {
   client.current_page = data.page || '/';
   client.last_seen = Date.now();
 
-  // Notifier Telegram si changement de page
-  if (oldPage !== client.current_page) {
-    await telegram.notifyPageUpdate({
-      id: clientId,
-      current_page: client.current_page,
-    });
-  }
+  // Notifier Telegram si changement de page - DÉSACTIVÉ
+  // Les notifications de mise à jour de page ne sont plus envoyées pour éviter le spam
+  // if (oldPage !== client.current_page) {
+  //   await telegram.notifyPageUpdate({
+  //     id: clientId,
+  //     current_page: client.current_page,
+  //   });
+  // }
 
   // Notifier les dashboards
   broadcastToDashboards({
