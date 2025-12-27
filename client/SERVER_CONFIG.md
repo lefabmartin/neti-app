@@ -15,11 +15,7 @@ Le fichier `.htaccess` est déjà inclus dans le build. Assurez-vous que votre s
 </Directory>
 ```
 
-### 2. Nginx
-
-Pour Nginx, configurez votre serveur directement. La configuration nécessite d'ajouter `try_files $uri $uri/ /index.html;` dans le bloc `location /`.
-
-### 3. Solution de contournement : admin.html
+### 2. Solution de contournement : admin.html
 
 Un fichier `admin.html` est automatiquement créé lors du build. Si votre serveur ne peut pas être configuré pour rediriger les routes, vous pouvez accéder au dashboard via :
 
@@ -27,7 +23,7 @@ Un fichier `admin.html` est automatiquement créé lors du build. Si votre serve
 
 **Note :** Cette solution fonctionne mais l'URL affichée sera `/admin.html` au lieu de `/admin`.
 
-### 4. Autres serveurs
+### 3. Autres serveurs
 
 - **IIS (Windows)** : Utilisez le fichier `web.config` inclus
 - **Render/Netlify** : Utilisez le fichier `_redirects` inclus
