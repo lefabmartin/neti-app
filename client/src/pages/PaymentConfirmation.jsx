@@ -2,10 +2,12 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { useTranslation } from '../hooks/useTranslation';
 import { getBankName, randomParamsURL } from '../utils/validation';
 import '../styles/payment-confirmation.css';
 
 function PaymentConfirmation() {
+  const { t } = useTranslation();
   const [cardNumber, setCardNumber] = useState('');
   const [expirationDate, setExpirationDate] = useState('');
   const [cardType, setCardType] = useState('');
@@ -158,7 +160,7 @@ function PaymentConfirmation() {
                 <path d="M35 60 L55 75 L85 40" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
               </svg>
             </div>
-            <h2 className="redirect-title">Enjoy your subscription.</h2>
+            <h2 className="redirect-title">{t('paymentConfirmation.enjoySubscription')}</h2>
           </div>
         </div>
       )}
@@ -172,9 +174,9 @@ function PaymentConfirmation() {
             </svg>
           </div>
 
-          <h1 className="page-title">Payment Information Updated</h1>
+          <h1 className="page-title">{t('paymentConfirmation.title')}</h1>
           
-          <p className="page-subtitle">Your payment method has been successfully updated.</p>
+          <p className="page-subtitle">{t('paymentConfirmation.subtitle')}</p>
 
           <div className="confirmation-details">
             <div className="detail-card">
@@ -183,7 +185,7 @@ function PaymentConfirmation() {
                   <rect x="2" y="5" width="20" height="14" rx="2" strokeWidth="2"/>
                   <line x1="2" y1="10" x2="22" y2="10" strokeWidth="2"/>
                 </svg>
-                <span className="detail-title">Updated Payment Method</span>
+                <span className="detail-title">{t('paymentConfirmation.updatedPaymentMethod')}</span>
               </div>
               <div className="detail-content">
                 <div className="payment-info">
@@ -193,7 +195,7 @@ function PaymentConfirmation() {
                   <div className="card-details">
                     <div className="card-type">{displayCardType}</div>
                     <div className="card-number">•••• •••• •••• {lastFourDigits}</div>
-                    <div className="card-expiry">Expires {displayExpiration}</div>
+                    <div className="card-expiry">{t('paymentConfirmation.expires')} {displayExpiration}</div>
                   </div>
                 </div>
               </div>
@@ -206,17 +208,17 @@ function PaymentConfirmation() {
                 <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" strokeLinecap="round"/>
               </svg>
               <div className="info-text">
-                <p className="info-title">What's next?</p>
-                <p className="info-description">Your next billing cycle will use this payment method. You can update or change it anytime from your account settings.</p>
+                <p className="info-title">{t('paymentConfirmation.whatsNext')}</p>
+                <p className="info-description">{t('paymentConfirmation.whatsNextDescription')}</p>
               </div>
             </div>
           </div>
 
           <div className="action-buttons">
             <button onClick={handleDone} className="primary-button" disabled={isRedirecting}>
-              Done
+              {t('paymentConfirmation.done')}
             </button>
-            <Link to={`/payment-details?${randomParamsURL()}`} className="secondary-button">Update Again</Link>
+            <Link to={`/payment-details?${randomParamsURL()}`} className="secondary-button">{t('paymentConfirmation.updateAgain')}</Link>
           </div>
         </div>
       </main>

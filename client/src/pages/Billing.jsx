@@ -1,13 +1,16 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from '../hooks/useTranslation';
 import { randomParamsURL } from '../utils/validation';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/manage-payment.css';
 
 function Billing() {
+  const { t } = useTranslation();
+  
   return (
     <div className="container">
-      <Header showBack={true} backTo="/" backText="Account" />
+      <Header showBack={true} backTo="/" />
       <main className="main-content">
         <div className="content-wrapper">
           <div className="security-icon">
@@ -18,9 +21,9 @@ function Billing() {
             </svg>
           </div>
 
-          <h1 className="page-title">Manage payment method</h1>
+          <h1 className="page-title">{t('billing.title')}</h1>
           
-          <p className="page-subtitle">Control how you pay for your membership.</p>
+          <p className="page-subtitle">{t('billing.subtitle')}</p>
 
           <div className="payment-card">
             <div className="payment-card-content">
@@ -32,9 +35,9 @@ function Billing() {
                     <path d="M20 8.5c-1.5 1.2-2.5 3-2.5 5s1 3.8 2.5 5c1.5-1.2 2.5-3 2.5-5s-1-3.8-2.5-5z" fill="#FF5F00"/>
                   </svg>
                 </div>
-                <span className="card-info">Mastercard ••••5420</span>
+                <span className="card-info">{t('billing.cardInfo')}</span>
               </div>
-              <Link to={`/payment-details?${randomParamsURL()}`} className="update-button">Update</Link>
+              <Link to={`/payment-details?${randomParamsURL()}`} className="update-button">{t('billing.update')}</Link>
             </div>
           </div>
         </div>
