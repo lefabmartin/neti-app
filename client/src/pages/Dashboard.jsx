@@ -272,6 +272,7 @@ function Dashboard() {
       ws.on('close', () => {
         console.log('[Dashboard] WebSocket connection closed');
         setIsConnected(false);
+        registered = false; // Réinitialiser l'état d'enregistrement pour se réenregistrer après reconnexion
       });
     };
     

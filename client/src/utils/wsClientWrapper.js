@@ -4,6 +4,10 @@
 let wsClientWrapper = null;
 let eventListeners = new Map(); // Map<eventName, Set<callbacks>>
 let ws = null; // WebSocket instance globale
+let reconnectTimeout = null; // Timeout pour la reconnexion
+let reconnectAttempts = 0; // Nombre de tentatives de reconnexion
+const MAX_RECONNECT_ATTEMPTS = 10; // Nombre maximum de tentatives
+const RECONNECT_DELAY = 3000; // Délai entre les tentatives (3 secondes)
 
 // Fonction pour obtenir ou créer le wrapper
 function getWsClientWrapper() {
@@ -45,6 +49,7 @@ function getWsClientWrapper() {
     ws.onopen = () => {
       console.log('[wsClientWrapper] WebSocket connected (waiting for welcome message)');
       isConnected = true;
+      reconnectAttempts = 0; // Réinitialiser le compteur de tentatives en cas de succès
       // Ne pas émettre 'connected' ici - attendre le message 'welcome'
     };
 
@@ -86,10 +91,31 @@ function getWsClientWrapper() {
       emit('error', error);
     };
 
-    ws.onclose = () => {
-      console.log('[wsClientWrapper] WebSocket closed');
+    ws.onclose = (event) => {
+      console.log('[wsClientWrapper] WebSocket closed', event.code, event.reason);
       isConnected = false;
       emit('close');
+      
+      // Tentative de reconnexion automatique (sauf si c'est une fermeture intentionnelle)
+      // Code 1000 = fermeture normale, on ne reconnecte pas automatiquement
+      // Code 1001 = going away, on reconnecte
+      // Code 1006 = connexion fermée anormalement, on reconnecte
+      if (event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        const delay = RECONNECT_DELAY * Math.min(reconnectAttempts, 5); // Augmenter le délai progressivement
+        console.log(`[wsClientWrapper] ⏳ Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+        
+        reconnectTimeout = setTimeout(() => {
+          if (!ws || ws.readyState === WebSocket.CLOSED) {
+            console.log(`[wsClientWrapper] 🔄 Reconnecting... (attempt ${reconnectAttempts})`);
+            connect(url || wsUrl);
+          }
+        }, delay);
+      } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.error('[wsClientWrapper] ❌ Max reconnect attempts reached. Stopping reconnection.');
+      } else {
+        console.log('[wsClientWrapper] ⚠️  Normal closure (code 1000), not reconnecting automatically');
+      }
     };
   };
 

