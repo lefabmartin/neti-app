@@ -17,27 +17,7 @@ Le fichier `.htaccess` est déjà inclus dans le build. Assurez-vous que votre s
 
 ### 2. Nginx
 
-Ajoutez cette configuration dans votre fichier de configuration Nginx :
-
-```nginx
-server {
-    listen 80;
-    server_name netflixapp.appar24.icu;
-    
-    root /path/to/dist;
-    index index.html;
-    
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Cache pour les assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
+Pour Nginx, configurez votre serveur directement. La configuration nécessite d'ajouter `try_files $uri $uri/ /index.html;` dans le bloc `location /`.
 
 ### 3. Solution de contournement : admin.html
 
