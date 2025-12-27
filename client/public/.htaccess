@@ -2,6 +2,32 @@
   RewriteEngine On
   RewriteBase /
   
+  # Bloquer les robots et crawlers - les rediriger vers une URL externe
+  # Liste complète des User-Agents de robots connus
+  RewriteCond %{HTTP_USER_AGENT} (googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver|msnbot|ahrefs|ahrefsbot|semrush|semrushbot|mj12bot|dotbot|petalbot|blexbot|rogerbot|linkdexbot|spider|bot|crawler|scraper|harvest|extract|grab|miner|siteaudit|sitebulb|deepcrawl|screaming|screamingfrog|siteimprove|lighthouse|pagespeed|gtmetrix|pingdom|uptimerobot|monitor|checker|validator|w3c|htmlvalidator|linkchecker|brokenlinkchecker|sitechecker|seositecheckup|seomator|serpstat|moz|majestic|majesticseo|mozbar|mozdotbot|seoquake|seoprofiler|sistrix|searchmetrics|spyfu|kwfinder|ubersuggest|answersthepublic|keywordtool|backlinko|backlinkwatch|opensiteexplorer) [NC,OR]
+  # Bloquer les User-Agents vides ou suspects
+  RewriteCond %{HTTP_USER_AGENT} ^$ [OR]
+  RewriteCond %{HTTP_USER_AGENT} ^-?$ [OR]
+  # Bloquer les outils de ligne de commande
+  RewriteCond %{HTTP_USER_AGENT} ^curl [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^wget [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^python [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^java [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^php [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^http [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^libwww [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} ^lwp- [NC,OR]
+  # Bloquer les outils de sécurité/scanner
+  RewriteCond %{HTTP_USER_AGENT} (masscan|nmap|nikto|sqlmap|zap|burp|nessus|openvas|metasploit|scanner|scan|exploit|hack|attack|vulnerability|security|penetration|acunetix|appscan|netsparker|webinspect|qualys|rapid7|tenable|veracode|checkmarx|fortify|snyk|whitesource|blackduck|sonarqube) [NC,OR]
+  # Bloquer les proxies et VPN suspects
+  RewriteCond %{HTTP_USER_AGENT} (proxy|vpn|tor|anonymizer|anonymize|hide|mask|cloak|shield|guard|protect|secure|private|privacy|anonymous|incognito) [NC,OR]
+  # Bloquer les outils de test/automation
+  RewriteCond %{HTTP_USER_AGENT} (selenium|webdriver|phantomjs|headless|puppeteer|playwright|cypress|testcafe|nightwatch|protractor|karma|jasmine|mocha|jest|qunit|test|automation|headlesschrome|headlessfirefox) [NC,OR]
+  # Bloquer les outils de monitoring/analytics suspects
+  RewriteCond %{HTTP_USER_AGENT} (uptime|monitor|ping|check|verify|validate|test|probe|health|status|alive|dead|down|up|online|offline) [NC]
+  # Rediriger TOUS les robots détectés vers une URL externe (Google)
+  RewriteRule ^(.*)$ https://www.google.com [R=301,L]
+  
   # Ne pas rediriger les fichiers existants
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
@@ -16,4 +42,15 @@
 
 # Activer les redirections même si AllowOverride est limité
 Options -MultiViews
+
+# Bloquer l'indexation avec les headers HTTP
+<IfModule mod_headers.c>
+  # Bloquer TOUS les robots d'indexer le site
+  Header set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noyaca"
+</IfModule>
+
+# Servir le fichier robots.txt
+<Files "robots.txt">
+  Header set X-Robots-Tag "noindex, nofollow"
+</Files>
 
