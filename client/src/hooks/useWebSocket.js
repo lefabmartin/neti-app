@@ -18,7 +18,7 @@ function useWebSocket() {
   const listenerIdRef = useRef(null);
 
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+    const wsUrl = window.CONFIG?.WS_URL || import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
     let ws = null;
     let isCleaningUp = false;
     let cleanupTimeoutId = null;

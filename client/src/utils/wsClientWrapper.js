@@ -15,7 +15,7 @@ function getWsClientWrapper() {
   // Note: On doit accéder à globalWebSocket via le module useWebSocket
   // Pour cela, on va créer une connexion WebSocket dédiée pour le dashboard
   
-  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+  const wsUrl = window.CONFIG?.WS_URL || import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
   let isConnected = false;
   let clientId = null;
 
@@ -164,13 +164,31 @@ function getWsClientWrapper() {
 
 // Exposer sur window pour que Dashboard puisse l'utiliser
 if (typeof window !== 'undefined') {
-  // Initialiser le wrapper
-  window.wsClient = getWsClientWrapper();
+  // Fonction pour initialiser et connecter
+  const initAndConnect = () => {
+    // Initialiser le wrapper
+    if (!window.wsClient) {
+      window.wsClient = getWsClientWrapper();
+    }
+    
+    // Connecter automatiquement si pas déjà connecté
+    if (!window.wsClient.isConnected) {
+      const wsUrl = window.CONFIG?.WS_URL || import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+      console.log('[wsClientWrapper] Initializing with WebSocket URL:', wsUrl);
+      console.log('[wsClientWrapper] window.CONFIG:', window.CONFIG);
+      window.wsClient.connect(wsUrl);
+    }
+  };
   
-  // Connecter automatiquement si pas déjà connecté
-  if (!window.wsClient.isConnected) {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
-    window.wsClient.connect(wsUrl);
+  // Attendre que config.js soit chargé
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      // Attendre un peu plus pour que config.js soit chargé
+      setTimeout(initAndConnect, 50);
+    });
+  } else {
+    // DOM déjà chargé, attendre un peu pour config.js
+    setTimeout(initAndConnect, 50);
   }
 }
 
