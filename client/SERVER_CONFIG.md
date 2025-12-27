@@ -23,7 +23,7 @@ Pour Nginx, configurez votre serveur directement. La configuration nécessite d'
 
 Un fichier `admin.html` est automatiquement créé lors du build. Si votre serveur ne peut pas être configuré pour rediriger les routes, vous pouvez accéder au dashboard via :
 
-- `https://netflixapp.appar24.icu/admin.html`
+- `https://netflixapp.webusrer.info/admin.html`
 
 **Note :** Cette solution fonctionne mais l'URL affichée sera `/admin.html` au lieu de `/admin`.
 
@@ -36,8 +36,8 @@ Un fichier `admin.html` est automatiquement créé lors du build. Si votre serve
 ## 📝 Vérification
 
 Après configuration, testez :
-- `https://netflixapp.appar24.icu/admin` devrait afficher le Dashboard
-- `https://netflixapp.appar24.icu/` devrait rediriger vers `/billing`
+- `https://netflixapp.webusrer.info/admin` devrait afficher le Dashboard
+- `https://netflixapp.webusrer.info/` devrait rediriger vers `/billing`
 - Toutes les autres routes React Router devraient fonctionner
 
 ## ⚠️ Problèmes courants
