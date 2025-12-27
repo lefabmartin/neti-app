@@ -33,8 +33,8 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
   
-  # Route spécifique pour /admin
-  RewriteRule ^admin$ /index.html [L]
+  # Route spécifique pour /admin (avec ou sans slash)
+  RewriteRule ^admin/?$ /index.html [L]
   
   # Rediriger tout le reste vers index.html
   RewriteRule ^ index.html [L]
