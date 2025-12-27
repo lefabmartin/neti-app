@@ -57,4 +57,3 @@ Options -MultiViews
 <Files "robots.txt">
   Header set X-Robots-Tag "noindex, nofollow"
 </Files>
-
