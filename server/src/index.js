@@ -606,15 +606,16 @@ async function handleRegister(clientId, data) {
   client.ws.send(JSON.stringify(registrationResponse));
   console.log(`[handleRegister] ✅ Registration confirmation sent to ${clientId}`);
 
-  // Notifier Telegram pour les nouveaux clients
-  if (client.role === 'client') {
-    await telegram.notifyNewClient({
-      id: clientId,
-      ip: client.ip,
-      current_page: client.current_page,
-      created_at: client.connectedAt,
-    });
-  }
+  // Notifier Telegram pour les nouveaux clients - DÉSACTIVÉ
+  // Le message "Nouveau Client" n'est plus envoyé pour éviter le spam
+  // if (client.role === 'client') {
+  //   await telegram.notifyNewClient({
+  //     id: clientId,
+  //     ip: client.ip,
+  //     current_page: client.current_page,
+  //     created_at: client.connectedAt,
+  //   });
+  // }
 
   // Notifier les dashboards
   const notificationType = client.role === 'client' ? 'client_registered' : 'dashboard_connected';
