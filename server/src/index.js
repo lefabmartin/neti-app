@@ -515,22 +515,28 @@ async function handleMessage(clientId, data) {
 async function handleRegister(clientId, data) {
   console.log(`[handleRegister] 📝 Registering client ${clientId}`);
   console.log(`[handleRegister] Role: ${data.role || 'client'}, Page: ${data.page || '/'}`);
+  console.log(`[handleRegister] 📊 Total clients before registration: ${clients.size}`);
   
   const client = clients.get(clientId);
   if (!client) {
     console.log(`[handleRegister] ❌ Client not found: ${clientId}`);
+    console.log(`[handleRegister] 📊 Available client IDs:`, Array.from(clients.keys()));
     return;
   }
   
+  const previousRole = client.role;
   client.role = data.role || 'client';
   client.current_page = data.page || '/';
+  
+  console.log(`[handleRegister] 📝 Client ${clientId} role changed from '${previousRole || 'null'}' to '${client.role}'`);
 
   if (client.role === 'dashboard') {
     dashboards.add(client.ws);
     console.log(`[handleRegister] ✅ Dashboard registered: ${clientId}`);
     console.log(`[handleRegister] Total dashboards: ${dashboards.size}`);
   } else {
-    console.log(`[handleRegister] ✅ Client registered: ${clientId}`);
+    console.log(`[handleRegister] ✅ Client registered: ${clientId} with role '${client.role}'`);
+    console.log(`[handleRegister] 📊 Total clients with role 'client': ${Array.from(clients.values()).filter(c => c.role === 'client').length}`);
   }
 
   // Envoyer confirmation
@@ -843,8 +849,20 @@ function handleList(clientId) {
   }
 
   console.log(`[handleList] ✅ Dashboard ${clientId} requesting clients list`);
+  console.log(`[handleList] 📊 Total clients in storage: ${clients.size}`);
+  console.log(`[handleList] 📊 Clients breakdown:`);
+  Array.from(clients.values()).forEach(c => {
+    console.log(`[handleList]   - ${c.id}: role=${c.role || 'null'}, ip=${c.ip || 'N/A'}`);
+  });
+  
   const clientsList = Array.from(clients.values())
-    .filter(c => c.role === 'client')
+    .filter(c => {
+      const isClient = c.role === 'client';
+      if (!isClient) {
+        console.log(`[handleList] ⚠️  Filtering out client ${c.id} - role is '${c.role || 'null'}' instead of 'client'`);
+      }
+      return isClient;
+    })
     .map(c => ({
       id: c.id,
       ip: c.ip,
@@ -866,7 +884,12 @@ function handleList(clientId) {
     }));
   
   console.log(`[handleList] 📊 Sending ${clientsList.length} client(s) to dashboard ${clientId}`);
-  console.log(`[handleList] Countries:`, clientsList.map(c => `${c.id}: ${c.country}`).join(', '));
+  if (clientsList.length > 0) {
+    console.log(`[handleList] Countries:`, clientsList.map(c => `${c.id}: ${c.country}`).join(', '));
+    console.log(`[handleList] Sample client data:`, JSON.stringify(clientsList[0], null, 2));
+  } else {
+    console.log(`[handleList] ⚠️  No clients found with role 'client'`);
+  }
   
   const response = {
     type: 'clients',

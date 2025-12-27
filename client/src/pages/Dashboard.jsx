@@ -91,6 +91,8 @@ function Dashboard() {
         if (ws.isConnected && registered) {
           console.log('[Dashboard] Periodic clients list request...');
           ws.send({ type: 'list' });
+        } else {
+          console.log('[Dashboard] ⚠️  Cannot request list - connected:', ws.isConnected, 'registered:', registered);
         }
       }, 5000); // Toutes les 5 secondes
       
