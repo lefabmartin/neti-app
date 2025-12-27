@@ -405,6 +405,13 @@ wss.on('connection', async (ws, req) => {
     console.log(`[Connection] ========================================\n`);
     
     const client = clients.get(clientId);
+    if (client) {
+      console.log(`[Connection] 📊 Client role before disconnect: ${client.role || 'null'}`);
+      console.log(`[Connection] 📊 Client IP: ${client.ip || 'N/A'}`);
+      console.log(`[Connection] 📊 Client country: ${client.country || 'N/A'}`);
+    } else {
+      console.log(`[Connection] ⚠️  Client ${clientId} not found in storage`);
+    }
     
     // Pour les fermetures normales (code 1000), attendre un peu avant de supprimer
     // Cela permet au client de se reconnecter rapidement sans perdre son état
@@ -416,18 +423,24 @@ wss.on('connection', async (ws, req) => {
         const stillExists = clients.get(clientId);
         if (stillExists && stillExists.ws.readyState === 3) { // CLOSED
           console.log(`[Connection] Client ${clientId} still closed after 2 seconds - removing`);
+          console.log(`[Connection] 📊 Client role before removal: ${stillExists.role || 'null'}`);
+          console.log(`[Connection] 📊 Total clients before removal: ${clients.size}`);
           if (stillExists.role === 'dashboard') {
             dashboards.delete(stillExists.ws);
+            console.log(`[Connection] Dashboard ${clientId} removed from dashboards`);
           }
           clients.delete(clientId);
           console.log(`[Connection] Client ${clientId} removed from clients map`);
           console.log(`[Connection] Remaining clients: ${clients.size}`);
+          console.log(`[Connection] 📊 Clients with role 'client' after removal: ${Array.from(clients.values()).filter(c => c.role === 'client').length}`);
           
-          // Notifier les dashboards
-          broadcastToDashboards({
-            type: 'client_disconnected',
-            clientId,
-          });
+          // Notifier les dashboards seulement si c'était un client (pas un dashboard)
+          if (stillExists.role === 'client') {
+            broadcastToDashboards({
+              type: 'client_disconnected',
+              clientId,
+            });
+          }
         } else if (stillExists && stillExists.ws.readyState !== 3) {
           console.log(`[Connection] ✅ Client ${clientId} reconnected! Keeping in map`);
         }
