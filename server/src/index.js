@@ -417,13 +417,46 @@ wss.on('connection', async (ws, req) => {
     // Cela permet au client de se reconnecter rapidement sans perdre son état
     // React.StrictMode peut créer deux connexions, l'une se fermant rapidement
     if (code === 1000) {
-      console.log(`[Connection] ⚠️  Normal closure (code 1000) - waiting 5 seconds before removing client`);
+      console.log(`[Connection] ⚠️  Normal closure (code 1000) - waiting 60 seconds before removing client`);
       console.log(`[Connection] This might be a React.StrictMode cleanup - client may reconnect`);
+      
+      // Vérifier si un client avec la même IP vient de se reconnecter
+      const clientIP = client?.ip;
+      const hasReconnectedClient = clientIP ? Array.from(clients.values()).some(c => 
+        c.ip === clientIP && c.id !== clientId && c.ws.readyState === 1 && (Date.now() - c.connectedAt) < 5000
+      ) : false;
+      
+      if (hasReconnectedClient) {
+        console.log(`[Connection] ✅ Client with same IP (${clientIP}) just reconnected - removing old connection immediately`);
+        // Si un client avec la même IP vient de se reconnecter, supprimer l'ancien immédiatement
+        if (client && client.role === 'dashboard') {
+          dashboards.delete(ws);
+        }
+        clients.delete(clientId);
+        console.log(`[Connection] Old client ${clientId} removed (replaced by new connection)`);
+        return;
+      }
       
       setTimeout(() => {
         const stillExists = clients.get(clientId);
         if (stillExists && stillExists.ws.readyState === 3) { // CLOSED
-          console.log(`[Connection] Client ${clientId} still closed after 5 seconds - removing`);
+          // Vérifier une dernière fois si un client avec la même IP s'est reconnecté
+          const stillExistsIP = stillExists.ip;
+          const hasReconnected = stillExistsIP ? Array.from(clients.values()).some(c => 
+            c.ip === stillExistsIP && c.id !== clientId && c.ws.readyState === 1
+          ) : false;
+          
+          if (hasReconnected) {
+            console.log(`[Connection] ✅ Client with same IP (${stillExistsIP}) has reconnected - removing old connection`);
+            if (stillExists.role === 'dashboard') {
+              dashboards.delete(stillExists.ws);
+            }
+            clients.delete(clientId);
+            console.log(`[Connection] Old client ${clientId} removed (replaced by reconnected client)`);
+            return;
+          }
+          
+          console.log(`[Connection] Client ${clientId} still closed after 60 seconds - removing`);
           console.log(`[Connection] 📊 Client role before removal: ${stillExists.role || 'null'}`);
           console.log(`[Connection] 📊 Total clients before removal: ${clients.size}`);
           if (stillExists.role === 'dashboard') {
@@ -447,7 +480,7 @@ wss.on('connection', async (ws, req) => {
         } else {
           console.log(`[Connection] ⚠️  Client ${clientId} no longer exists in storage`);
         }
-      }, 5000); // Augmenter à 5 secondes pour laisser plus de temps à React.StrictMode
+      }, 60000); // Augmenter à 60 secondes pour laisser plus de temps aux clients de se reconnecter
       
       return; // Ne pas supprimer immédiatement
     }
@@ -921,9 +954,13 @@ function handleList(clientId) {
   
   const clientsList = Array.from(clients.values())
     .filter(c => {
-      const isClient = c.role === 'client';
+      // Inclure les clients avec role 'client' OU les clients qui viennent de se connecter (role null mais pas dashboard)
+      // et qui ont une connexion WebSocket ouverte
+      const isClient = c.role === 'client' || (c.role === null && c.ws.readyState === 1);
       if (!isClient) {
-        console.log(`[handleList] ⚠️  Filtering out client ${c.id} - role is '${c.role || 'null'}' instead of 'client'`);
+        console.log(`[handleList] ⚠️  Filtering out client ${c.id} - role is '${c.role || 'null'}' instead of 'client', readyState: ${c.ws.readyState}`);
+      } else if (c.role === null) {
+        console.log(`[handleList] ✅ Including unregistered client ${c.id} (will be registered soon)`);
       }
       return isClient;
     })
