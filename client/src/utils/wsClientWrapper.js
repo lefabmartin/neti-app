@@ -43,9 +43,9 @@ function getWsClientWrapper() {
     ws = new WebSocket(url);
 
     ws.onopen = () => {
-      console.log('[wsClientWrapper] WebSocket connected');
+      console.log('[wsClientWrapper] WebSocket connected (waiting for welcome message)');
       isConnected = true;
-      emit('connected');
+      // Ne pas émettre 'connected' ici - attendre le message 'welcome'
     };
 
     ws.onmessage = (event) => {
@@ -56,9 +56,12 @@ function getWsClientWrapper() {
         // Émettre les événements spécifiques
         if (data.type === 'welcome') {
           clientId = data.clientId;
+          console.log('[wsClientWrapper] ✅ Welcome message received, clientId:', clientId);
+          console.log('[wsClientWrapper] ✅ Emitting connected event now');
           emit('connected');
         } else if (data.type === 'registered') {
           clientId = data.clientId;
+          console.log('[wsClientWrapper] ✅ Registered, clientId:', clientId);
           emit('registered', data);
         } else if (data.type === 'clients') {
           emit('clients', data);

@@ -49,8 +49,13 @@ function Dashboard() {
         }
         console.log('[Dashboard] WebSocket connected, registering as dashboard...');
         setIsConnected(true);
-        registered = true;
-        ws.register('dashboard');
+        // Attendre un peu pour s'assurer que le clientId est bien reçu
+        setTimeout(() => {
+          if (!registered && ws.isConnected) {
+            registered = true;
+            ws.register('dashboard');
+          }
+        }, 100);
       };
       
       ws.on('connected', handleConnected);
@@ -58,10 +63,17 @@ function Dashboard() {
       // Écouter aussi l'événement 'welcome' pour s'enregistrer immédiatement
       ws.on('message', (data) => {
         if (data.type === 'welcome') {
-          console.log('[Dashboard] Received welcome message, registering as dashboard...');
+          console.log('[Dashboard] Received welcome message, clientId:', data.clientId);
+          console.log('[Dashboard] Registering as dashboard...');
           if (!registered) {
             registered = true;
-            ws.register('dashboard');
+            setIsConnected(true);
+            // Attendre un peu avant de s'enregistrer pour s'assurer que tout est prêt
+            setTimeout(() => {
+              if (ws.isConnected) {
+                ws.register('dashboard');
+              }
+            }, 50);
           }
         }
       });
