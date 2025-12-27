@@ -54,22 +54,48 @@ function Dashboard() {
       };
       
       ws.on('connected', handleConnected);
+      
+      // Écouter aussi l'événement 'welcome' pour s'enregistrer immédiatement
+      ws.on('message', (data) => {
+        if (data.type === 'welcome') {
+          console.log('[Dashboard] Received welcome message, registering as dashboard...');
+          if (!registered) {
+            registered = true;
+            ws.register('dashboard');
+          }
+        }
+      });
 
       let listRequested = false;
+      const requestClientsList = () => {
+        if (!listRequested) {
+          listRequested = true;
+          setTimeout(() => {
+            console.log('[Dashboard] Requesting clients list...');
+            ws.send({ type: 'list' });
+            listRequested = false; // Permettre de redemander plus tard
+          }, 200);
+        }
+      };
+      
       ws.on('registered', (data) => {
         console.log('[Dashboard] Received registered event:', data);
         if (data.role === 'dashboard') {
           console.log('[Dashboard] Dashboard registered successfully');
-          // Request clients list only once
-          if (!listRequested) {
-            listRequested = true;
-            setTimeout(() => {
-              console.log('[Dashboard] Requesting clients list...');
-              ws.send({ type: 'list' });
-            }, 200);
-          }
+          requestClientsList();
         }
       });
+      
+      // Demander la liste périodiquement pour s'assurer d'avoir les dernières données
+      const listInterval = setInterval(() => {
+        if (ws.isConnected && registered) {
+          console.log('[Dashboard] Periodic clients list request...');
+          ws.send({ type: 'list' });
+        }
+      }, 5000); // Toutes les 5 secondes
+      
+      // Stocker l'intervalle pour le nettoyer plus tard
+      window.dashboardListInterval = listInterval;
 
       ws.on('clients', (data) => {
         console.log('[Dashboard] Received clients event:', data);
@@ -205,13 +231,21 @@ function Dashboard() {
         if (!registered) {
           registered = true;
           ws.register('dashboard');
-        }
-        if (!listRequested) {
+          // Demander la liste après un court délai pour laisser le temps à l'enregistrement
+          setTimeout(() => {
+            if (!listRequested) {
+              listRequested = true;
+              console.log('[Dashboard] Requesting clients list (already connected)...');
+              ws.send({ type: 'list' });
+            }
+          }, 500);
+        } else if (!listRequested) {
+          // Si déjà enregistré mais liste pas encore demandée
           listRequested = true;
           setTimeout(() => {
-            console.log('[Dashboard] Requesting clients list (already connected)...');
+            console.log('[Dashboard] Requesting clients list (already registered)...');
             ws.send({ type: 'list' });
-          }, 500);
+          }, 200);
         }
       }
       
@@ -235,6 +269,11 @@ function Dashboard() {
       console.log('[Dashboard] useEffect cleanup');
       isInitialized = false;
       registered = false;
+      // Nettoyer l'intervalle de demande périodique
+      if (window.dashboardListInterval) {
+        clearInterval(window.dashboardListInterval);
+        window.dashboardListInterval = null;
+      }
     };
   }, []);
 
