@@ -2,11 +2,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import enTranslations from '../locales/en';
 import frTranslations from '../locales/fr';
 import deTranslations from '../locales/de';
+import esTranslations from '../locales/es';
 
 const translations = {
   en: enTranslations,
   fr: frTranslations,
-  de: deTranslations
+  de: deTranslations,
+  es: esTranslations
 };
 
 /**

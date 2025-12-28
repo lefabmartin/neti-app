@@ -6,7 +6,8 @@ const LanguageContext = createContext();
 export const SUPPORTED_LANGUAGES = {
   en: 'English',
   fr: 'Français',
-  de: 'Deutsch'
+  de: 'Deutsch',
+  es: 'Español'
 };
 
 // Langue par défaut
